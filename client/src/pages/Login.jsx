@@ -7,9 +7,12 @@ function Login() {
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/google", {
-        token: credentialResponse.credential,
-      });
+      const res = await axios.post(
+        "https://zendraft-bau8.onrender.com/api/auth/google",
+        {
+          token: credentialResponse.credential,
+        },
+      );
 
       // Save the JWT token to local storage for future API requests
       localStorage.setItem("token", res.data.token);
