@@ -1,29 +1,47 @@
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
+import axios from 'axios';
+import Dashboard from './pages/Dashboard';
 
-function App() {
-  const handleLoginSuccess = (credentialResponse) => {
-    console.log('✅ Mate, login was a success!', credentialResponse);
-    // Soon, we will send this token to our backend to verify and log the user in!
-  };
+function Login() {
+  const navigate = useNavigate();
 
-  const handleLoginError = () => {
-    console.error('❌ Login Failed');
+  const handleLoginSuccess = async (credentialResponse) => {
+    try {
+      const res = await axios.post('http://localhost:5000/api/auth/google', {
+        token: credentialResponse.credential
+      });
+      
+      localStorage.setItem('zenToken', res.data.token);
+      navigate('/dashboard');
+      
+    } catch (error) {
+      console.error('❌ Backend verification failed', error);
+    }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#f9fafb', fontFamily: 'sans-serif' }}>
-      <div style={{ background: '#fff', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-        <h1 style={{ margin: '0 0 10px 0', color: '#333' }}>ZenDraft</h1>
-        <p style={{ margin: '0 0 24px 0', color: '#666' }}>Your distraction-free writing space.</p>
-        
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-900 font-sans">
+      <div className="bg-gray-800 p-10 rounded-2xl shadow-xl text-center border border-gray-700">
+        <h1 className="text-3xl font-bold text-white mb-2">ZenDraft</h1>
+        <p className="text-gray-400 mb-8">Your distraction-free writing space.</p>
         <GoogleLogin 
           onSuccess={handleLoginSuccess} 
-          onError={handleLoginError} 
-          theme="filled_blue"
+          onError={() => console.error('❌ Login Failed')} 
+          theme="filled_black"
           shape="rectangular"
         />
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Login />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+    </Routes>
   );
 }
 
