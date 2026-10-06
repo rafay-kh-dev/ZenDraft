@@ -1,14 +1,37 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
 const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
-const User = require('./models/User'); // We created this schema earlier
+require('dotenv').config();
 
+const User = require('./models/User'); 
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// MongoDB Connection
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('Successfully connected to MongoDB'))
+  .catch((err) => console.error('MongoDB connection error:', err));
+
+// Initialise Google OAuth Client
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// Basic Health Check Route
+app.get('/', (req, res) => {
+  res.send('ZenDraft API is running...');
+});
+
+// Google Authentication Route
 app.post('/api/auth/google', async (req, res) => {
   const { token } = req.body;
 
   try {
-    // Verify the token with Google
     const ticket = await client.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -16,11 +39,9 @@ app.post('/api/auth/google', async (req, res) => {
     
     const { sub: googleId, name, email } = ticket.getPayload();
 
-    // Check if the author already exists in your database
     let user = await User.findOne({ googleId });
 
     if (!user) {
-      // Create a new author if this is their first time logging in
       user = await User.create({
         googleId,
         displayName: name,
@@ -28,10 +49,9 @@ app.post('/api/auth/google', async (req, res) => {
       });
     }
 
-    // Generate a secure JWT session token for your app
     const sessionToken = jwt.sign(
       { userId: user._id }, 
-      'super_secret_jwt_key_change_me_later', // We will put this in .env later
+      'super_secret_jwt_key_change_me_later', 
       { expiresIn: '7d' }
     );
 
@@ -40,4 +60,9 @@ app.post('/api/auth/google', async (req, res) => {
     console.error('Auth Error:', error);
     res.status(401).json({ message: 'Invalid Google Token' });
   }
+});
+
+// Start the Server
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
