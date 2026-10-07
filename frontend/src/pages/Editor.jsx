@@ -36,7 +36,7 @@ export default function Editor() {
   const navigate = useNavigate();
 
   // Access Control State
-  const [hasAccess, setHasAccess] = useState(true); // Isko 'false' kar ke aap "Request Access" screen test kar sakte hain
+  const [hasAccess, setHasAccess] = useState(true);
   const [requestEmail, setRequestEmail] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
   const [isRequestSent, setIsRequestSent] = useState(false);
@@ -57,7 +57,10 @@ export default function Editor() {
   const [accessMode, setAccessMode] = useState("Private");
   const [shareEmail, setShareEmail] = useState("");
   const [sharedUsers, setSharedUsers] = useState([]);
-  const [currentUser, setCurrentUser] = useState({ email: "", avatar: null });
+  const [currentUser, setCurrentUser] = useState({
+    email: "author@zendraft.com",
+    avatar: null,
+  });
 
   const editorRef = useRef(null);
   const contentRef = useRef("");
@@ -97,31 +100,33 @@ export default function Editor() {
       const token = localStorage.getItem("zenToken");
       if (!token) return navigate("/");
 
-      // Decode JWT Token for REAL User Info
+      // 🔥 SAFE JWT DECODING 🔥
+      let realEmail = "author@zendraft.com";
+      let realAvatar = null;
+
       try {
         const base64Url = token.split(".")[1];
-        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-        const jsonPayload = decodeURIComponent(
-          atob(base64)
-            .split("")
-            .map(function (c) {
-              return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-            })
-            .join(""),
-        );
-        const decodedToken = JSON.parse(jsonPayload);
+        if (base64Url) {
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map(function (c) {
+                return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+              })
+              .join(""),
+          );
+          const decodedToken = JSON.parse(jsonPayload);
 
-        const realEmail = decodedToken.email;
-        const realAvatar = decodedToken.picture || decodedToken.avatar || null;
-
-        setCurrentUser({ email: realEmail, avatar: realAvatar });
-        // Set Owner as the real user initially
-        setSharedUsers([
-          { email: realEmail, role: "Owner", avatar: realAvatar },
-        ]);
+          realEmail = decodedToken.email || realEmail;
+          realAvatar = decodedToken.picture || decodedToken.avatar || null;
+        }
       } catch (e) {
         console.error("Could not parse user info from token", e);
       }
+
+      setCurrentUser({ email: realEmail, avatar: realAvatar });
+      setSharedUsers([{ email: realEmail, role: "Owner", avatar: realAvatar }]);
 
       try {
         const currRes = await axios.get(`${API_BASE_URL}/api/drafts/${id}`, {
@@ -131,10 +136,8 @@ export default function Editor() {
         contentRef.current = currRes.data.content || "";
         if (editorRef.current) editorRef.current.innerHTML = contentRef.current;
         setStoryNotes(currRes.data.notes || "");
-        // Yahan backend se hum actual access check kar sakte hain. For now, assuming user has access.
       } catch (error) {
         console.error("Error fetching data:", error);
-        // Agar backend error de ke "Unauthorized" (403), toh hasAccess false kar denge
         if (error.response && error.response.status === 403) {
           setHasAccess(false);
         }
@@ -224,11 +227,9 @@ export default function Editor() {
     setColorMenuObj(null);
   };
 
-  // 🔥 Invite User Logic 🔥
   const handleShareInvite = (e) => {
     e.preventDefault();
     if (shareEmail.trim()) {
-      // Check if user already exists
       if (!sharedUsers.some((u) => u.email === shareEmail)) {
         setSharedUsers([
           ...sharedUsers,
@@ -239,16 +240,13 @@ export default function Editor() {
     }
   };
 
-  // 🔥 Remove User Logic 🔥
   const handleRemoveUser = (emailToRemove) => {
     setSharedUsers(sharedUsers.filter((user) => user.email !== emailToRemove));
   };
 
-  // 🔥 Request Access Form Handler 🔥
   const handleRequestAccess = (e) => {
     e.preventDefault();
     setIsRequestSent(true);
-    // Yahan backend API call aayegi owner ko email bhejne ke liye
   };
 
   const exportManuscript = () => {
@@ -275,7 +273,6 @@ export default function Editor() {
     }
   };
 
-  // 🌟 GOOGLE DOCS STYLE "NO ACCESS" SCREEN 🌟
   if (!hasAccess) {
     return (
       <div
@@ -410,7 +407,7 @@ export default function Editor() {
         }}
       />
 
-      {/* 🌟 PREMIUM SHARE MODAL WITH REMOVE USER OPTION 🌟 */}
+      {/* SHARE MODAL */}
       {isShareModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div
@@ -475,7 +472,7 @@ export default function Editor() {
                     className="flex justify-between items-center group"
                   >
                     <div className="flex items-center gap-4">
-                      {/* REAL GOOGLE AVATAR */}
+                      {/* 🔥 SAFE AVATAR / EMAIL FALLBACK 🔥 */}
                       <div
                         className={`w-9 h-9 rounded-full overflow-hidden flex items-center justify-center border ${theme.border} ${isDarkMode ? "bg-[#2A2A2A]" : "bg-[#EAE8E1]"}`}
                       >
@@ -489,16 +486,17 @@ export default function Editor() {
                           <span
                             className={`font-serif italic font-bold text-sm ${theme.textMain}`}
                           >
-                            {user.email.charAt(0).toUpperCase()}
+                            {user?.email
+                              ? user.email.charAt(0).toUpperCase()
+                              : "?"}
                           </span>
                         )}
                       </div>
                       <span className={`text-sm font-medium ${theme.textMain}`}>
-                        {user.email}
+                        {user?.email || "Unknown"}
                       </span>
                     </div>
 
-                    {/* Role & Remove Option */}
                     <div className="flex items-center gap-3">
                       <span
                         className={`text-xs tracking-wider ${theme.textMuted}`}
@@ -591,7 +589,6 @@ export default function Editor() {
         </div>
       )}
 
-      {/* STORY BIBLE DRAWER */}
       <aside
         className={`fixed right-0 top-0 h-full w-80 ${theme.bgDrawer} border-l ${theme.border} shadow-xl z-40 flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isNotesOpen ? "translate-x-0" : "translate-x-full"}`}
       >
@@ -632,7 +629,6 @@ export default function Editor() {
         />
       </aside>
 
-      {/* MAIN CANVAS */}
       <div
         className={`flex-1 flex flex-col relative w-full h-screen overflow-y-auto no-scrollbar transition-all duration-700 ${isNotesOpen ? "pr-80" : "pr-0"}`}
         onScroll={() => {
@@ -640,7 +636,6 @@ export default function Editor() {
           setColorMenuObj(null);
         }}
       >
-        {/* HEADER */}
         <header
           className={`sticky top-0 w-full px-8 py-6 flex justify-between items-center transition-all duration-700 z-30 ${isTyping ? "opacity-0 -translate-y-4" : "opacity-100 translate-y-0"}`}
         >
@@ -708,7 +703,6 @@ export default function Editor() {
             </div>
 
             <div className={`flex items-center gap-2`}>
-              {/* THEMED SHARE BUTTON */}
               <button
                 onClick={() => setIsShareModalOpen(true)}
                 className={`hidden sm:flex items-center gap-2 px-5 py-1.5 rounded-full font-medium text-[11px] tracking-widest uppercase transition-all shadow-sm ${theme.btnPrimaryBg} ${theme.btnPrimaryText} ${theme.btnPrimaryHover} mr-2`}
@@ -728,7 +722,6 @@ export default function Editor() {
                 </svg>
                 Share
               </button>
-
               <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 title="Night Mode"
@@ -875,7 +868,6 @@ export default function Editor() {
           <div
             className={`w-[1px] h-4 ${isDarkMode ? "bg-[#444]" : "bg-[#DDD]"} mx-1`}
           ></div>
-
           <button
             onMouseDown={(e) => {
               e.preventDefault();
@@ -919,7 +911,6 @@ export default function Editor() {
       <div
         className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-40 transition-all duration-700 ${isTyping ? "opacity-0 translate-y-8 pointer-events-none" : "opacity-100 translate-y-0"}`}
       >
-        {/* Color Popovers */}
         {colorMenuObj && (
           <div
             className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-4 p-3 rounded-2xl ${theme.glassBg} backdrop-blur-xl border ${theme.border} shadow-2xl flex flex-wrap gap-2 w-52 z-50`}
@@ -953,7 +944,6 @@ export default function Editor() {
                 </button>
               ),
             )}
-
             <div
               className="relative w-7 h-7 rounded-full border border-gray-300 overflow-hidden cursor-pointer flex items-center justify-center bg-gradient-to-tr from-red-500 via-green-500 to-blue-500 hover:scale-110 transition-transform shadow-sm"
               title="Custom Color"
