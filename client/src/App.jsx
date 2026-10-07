@@ -3,7 +3,6 @@ import { GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 import Dashboard from "./pages/Dashboard";
 
-// 1. Yahan humne dynamic URL set kar diya hai
 const API_BASE_URL = import.meta.env.DEV
   ? "http://localhost:5000"
   : "https://api.zendraft.codelume.online";
@@ -13,7 +12,6 @@ function Login() {
 
   const handleLoginSuccess = async (credentialResponse) => {
     try {
-      // 2. Yahan aapki updated axios request aa gayi
       const res = await axios.post(`${API_BASE_URL}/api/auth/google`, {
         token: credentialResponse.credential,
       });
@@ -32,6 +30,7 @@ function Login() {
         <p className="text-gray-400 mb-8">
           Your distraction-free writing space.
         </p>
+
         <GoogleLogin
           onSuccess={handleLoginSuccess}
           onError={() => console.error("❌ Login Failed")}
