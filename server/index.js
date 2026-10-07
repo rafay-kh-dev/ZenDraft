@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
+const Draft = require('./models/Draft');
+const auth = require('./middleware/auth');
 
 const app = express();
 app.use(express.json());
@@ -71,6 +73,32 @@ app.post('/api/auth/google', async (req, res) => {
     } catch (error) {
         console.error('❌ Auth Error:', error);
         res.status(401).json({ error: 'Authentication failed' });
+    }
+});
+
+// Fetch all drafts for the logged-in user
+app.get('/api/drafts', auth, async (req, res) => {
+    try {
+        const drafts = await Draft.find({ user: req.user.userId }).sort({ updatedAt: -1 });
+        res.status(200).json(drafts);
+    } catch (error) {
+        console.error('❌ Error fetching drafts:', error);
+        res.status(500).json({ error: 'Failed to fetch drafts' });
+    }
+});
+
+// Create a brand new draft
+app.post('/api/drafts', auth, async (req, res) => {
+    try {
+        const newDraft = await Draft.create({
+            user: req.user.userId,
+            title: req.body.title || 'Untitled Draft',
+            content: req.body.content || ''
+        });
+        res.status(201).json(newDraft);
+    } catch (error) {
+        console.error('❌ Error creating draft:', error);
+        res.status(500).json({ error: 'Failed to create draft' });
     }
 });
 
