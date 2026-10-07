@@ -113,17 +113,28 @@ app.get('/api/drafts/:id', auth, async (req, res) => {
     }
 });
 
-// Draft ko save/update karne ke liye
 app.put('/api/drafts/:id', auth, async (req, res) => {
     try {
+        const { title, content, notes } = req.body; // notes ko extract karein
         const updatedDraft = await Draft.findOneAndUpdate(
             { _id: req.params.id, user: req.user.userId },
-            { title: req.body.title, content: req.body.content },
-            { new: true } // Yeh naya updated draft wapas return karega
+            { title, content, notes }, // notes ko database mein update karein
+            { new: true }
         );
-        res.status(200).json(updatedDraft);
+        res.json(updatedDraft);
     } catch (error) {
         res.status(500).json({ error: 'Error updating draft' });
+    }
+});
+
+// Draft ko delete karne ke liye
+app.delete('/api/drafts/:id', auth, async (req, res) => {
+    try {
+        const deletedDraft = await Draft.findOneAndDelete({ _id: req.params.id, user: req.user.userId });
+        if (!deletedDraft) return res.status(404).json({ error: 'Draft not found' });
+        res.status(200).json({ message: 'Draft deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error deleting draft' });
     }
 });
 
