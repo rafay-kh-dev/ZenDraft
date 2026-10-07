@@ -102,6 +102,31 @@ app.post('/api/drafts', auth, async (req, res) => {
     }
 });
 
+// Kisi ek specific draft ko open karne ke liye
+app.get('/api/drafts/:id', auth, async (req, res) => {
+    try {
+        const draft = await Draft.findOne({ _id: req.params.id, user: req.user.userId });
+        if (!draft) return res.status(404).json({ error: 'Draft not found' });
+        res.status(200).json(draft);
+    } catch (error) {
+        res.status(500).json({ error: 'Error fetching draft' });
+    }
+});
+
+// Draft ko save/update karne ke liye
+app.put('/api/drafts/:id', auth, async (req, res) => {
+    try {
+        const updatedDraft = await Draft.findOneAndUpdate(
+            { _id: req.params.id, user: req.user.userId },
+            { title: req.body.title, content: req.body.content },
+            { new: true } // Yeh naya updated draft wapas return karega
+        );
+        res.status(200).json(updatedDraft);
+    } catch (error) {
+        res.status(500).json({ error: 'Error updating draft' });
+    }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server is running on port ${PORT}`);

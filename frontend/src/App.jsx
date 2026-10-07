@@ -2,6 +2,7 @@ import { Routes, Route, useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 import Dashboard from "./pages/Dashboard";
+import Editor from "./pages/Editor";
 
 const API_BASE_URL = import.meta.env.DEV
   ? "http://localhost:5000"
@@ -47,6 +48,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/editor/:id" element={<Editor />} />
     </Routes>
   );
 }
