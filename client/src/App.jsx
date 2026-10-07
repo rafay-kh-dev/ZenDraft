@@ -5,7 +5,7 @@ import Dashboard from "./pages/Dashboard";
 
 const API_BASE_URL = import.meta.env.DEV
   ? "http://localhost:5000"
-  : "https://api.zendraft.codelume.online";
+  : "https://zendraft-bau8.onrender.com";
 
 function Login() {
   const navigate = useNavigate();
