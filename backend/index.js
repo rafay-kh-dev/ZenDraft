@@ -113,18 +113,15 @@ app.get('/api/drafts/:id', auth, async (req, res) => {
     }
 });
 
-app.put('/api/drafts/:id', auth, async (req, res) => {
-    try {
-        const { title, content, notes } = req.body; // notes ko extract karein
-        const updatedDraft = await Draft.findOneAndUpdate(
-            { _id: req.params.id, user: req.user.userId },
-            { title, content, notes }, // notes ko database mein update karein
-            { new: true }
-        );
-        res.json(updatedDraft);
-    } catch (error) {
-        res.status(500).json({ error: 'Error updating draft' });
-    }
+app.put('/api/drafts/:id', authenticate, async (req, res) => {
+  try {
+    // req.body mein ab chahe Pin aaye, Tag aaye ya Trash, sab auto-update ho jayega
+    const draft = await Draft.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(draft);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error during update" });
+  }
 });
 
 // Draft ko delete karne ke liye
@@ -136,6 +133,40 @@ app.delete('/api/drafts/:id', auth, async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: 'Error deleting draft' });
     }
+});
+
+// ==========================================
+// 🗑️ MOVE TO TRASH (SOFT DELETE)
+// ==========================================
+app.put('/api/drafts/:id/trash', authenticate, async (req, res) => {
+  try {
+    const draft = await Draft.findByIdAndUpdate(
+      req.params.id, 
+      { isTrashed: true }, 
+      { new: true }
+    );
+    res.json(draft);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error during trash" });
+  }
+});
+
+// ==========================================
+// ♻️ RESTORE FROM TRASH
+// ==========================================
+app.put('/api/drafts/:id/restore', authenticate, async (req, res) => {
+  try {
+    const draft = await Draft.findByIdAndUpdate(
+      req.params.id, 
+      { isTrashed: false }, 
+      { new: true }
+    );
+    res.json(draft);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error during restore" });
+  }
 });
 
 const PORT = process.env.PORT || 5000;

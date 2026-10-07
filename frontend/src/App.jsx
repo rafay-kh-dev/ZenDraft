@@ -1,6 +1,7 @@
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
+import { useEffect } from "react";
 import Dashboard from "./pages/Dashboard";
 import Editor from "./pages/Editor";
 
@@ -11,6 +12,10 @@ const API_BASE_URL = import.meta.env.DEV
 function Login() {
   const navigate = useNavigate();
 
+  useEffect(() => {
+    document.title = "PenDraft | Sign In";
+  }, []);
+
   const handleLoginSuccess = async (credentialResponse) => {
     try {
       const res = await axios.post(`${API_BASE_URL}/api/auth/google`, {
@@ -18,7 +23,7 @@ function Login() {
       });
 
       localStorage.setItem("zenToken", res.data.token);
-      navigate("/dashboard");
+      navigate("/library");
     } catch (error) {
       console.error("❌ Backend verification failed", error);
     }
@@ -27,7 +32,7 @@ function Login() {
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-900 font-sans">
       <div className="bg-gray-800 p-10 rounded-2xl shadow-xl text-center border border-gray-700">
-        <h1 className="text-3xl font-bold text-white mb-2">ZenDraft</h1>
+        <h1 className="text-3xl font-bold text-white mb-2">PenDraft</h1>
         <p className="text-gray-400 mb-8">
           Your distraction-free writing space.
         </p>
@@ -47,7 +52,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/library" element={<Dashboard />} />
       <Route path="/editor/:id" element={<Editor />} />
     </Routes>
   );
