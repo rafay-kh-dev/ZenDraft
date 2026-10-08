@@ -23,7 +23,7 @@ export default function TopHeader({
       className={`sticky top-0 w-full px-8 py-5 flex justify-between items-center transition-all duration-700 z-30 ${isTyping ? "opacity-0 -translate-y-4 pointer-events-none" : "opacity-100 translate-y-0"}`}
     >
       <button
-        onClick={() => navigate("/library")}
+        onClick={() => navigate("/desk")}
         className={`group flex items-center gap-2.5 px-3 py-1.5 rounded-full ${theme.textMuted} hover:${theme.textMain} ${isDarkMode ? "hover:bg-white/5" : "hover:bg-black/5"} transition-all`}
       >
         <svg

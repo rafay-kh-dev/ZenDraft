@@ -6,6 +6,8 @@ const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
 const Draft = require('./models/Draft');
 const auth = require('./middleware/auth');
+const Folder = require('./models/Folder');
+const Lore = require('./models/Lore');
 
 const app = express();
 app.use(express.json());
@@ -202,4 +204,86 @@ app.put('/api/drafts/:id/restore', auth, async (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server is running on port ${PORT}`);
+});
+
+// ==========================================
+// 📁 PROJECTS (FOLDERS) ROUTES
+// ==========================================
+
+// Get all projects for user
+app.get('/api/folders', auth, async (req, res) => {
+    try {
+        const folders = await Folder.find({ user: req.user.userId }).sort({ createdAt: -1 });
+        res.status(200).json(folders);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch projects' });
+    }
+});
+
+// Create a project
+app.post('/api/folders', auth, async (req, res) => {
+    try {
+        const newFolder = await Folder.create({
+            user: req.user.userId,
+            name: req.body.name || 'Untitled Project',
+            description: req.body.description || '',
+            color: req.body.color || '#D4AF37'
+        });
+        res.status(201).json(newFolder);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create project' });
+    }
+});
+
+// Delete a project
+app.delete('/api/folders/:id', auth, async (req, res) => {
+    try {
+        await Folder.findOneAndDelete({ _id: req.params.id, user: req.user.userId });
+        // Optional: unassign drafts from this folder
+        await Draft.updateMany({ folder: req.params.id }, { folder: null });
+        res.status(200).json({ message: 'Project deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete project' });
+    }
+});
+
+
+// ==========================================
+// 📖 STORY BIBLE (LORE) ROUTES
+// ==========================================
+
+// Get all lore entries
+app.get('/api/lore', auth, async (req, res) => {
+    try {
+        const loreEntries = await Lore.find({ user: req.user.userId }).sort({ updatedAt: -1 });
+        res.status(200).json(loreEntries);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch story bible entries' });
+    }
+});
+
+// Create a lore entry
+app.post('/api/lore', auth, async (req, res) => {
+    try {
+        const newLore = await Lore.create({
+            user: req.user.userId,
+            title: req.body.title || 'New Entry',
+            category: req.body.category || 'Character',
+            content: req.body.content || '',
+            tags: req.body.tags || []
+        });
+        res.status(201).json(newLore);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create lore entry' });
+    }
+});
+
+// Delete a lore entry
+app.delete('/api/lore/:id', auth, async (req, res) => {
+    try {
+        await Lore.findOneAndDelete({ _id: req.params.id, user: req.user.userId });
+        res.status(200).json({ message: 'Lore entry deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete lore entry' });
+    }
 });
