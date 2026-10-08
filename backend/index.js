@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs'); 
+const User = require('./models/User'); // 🔥 Model imported cleanly from the modular file
 const Draft = require('./models/Draft');
 const auth = require('./middleware/auth');
 const Folder = require('./models/Folder');
@@ -32,16 +34,11 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected Successfully!'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
-const UserSchema = new mongoose.Schema({
-    googleId: String,
-    email: String,
-    name: String,
-    picture: String
-});
-const User = mongoose.model('User', UserSchema);
-
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// ==========================================
+// 1. GOOGLE AUTH ENDPOINT
+// ==========================================
 app.post('/api/auth/google', async (req, res) => {
     try {
         const { token } = req.body;
@@ -74,6 +71,80 @@ app.post('/api/auth/google', async (req, res) => {
     }
 });
 
+// ==========================================
+// 2. EMAIL/PASSWORD SIGNUP ENDPOINT
+// ==========================================
+app.post('/api/auth/signup', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        let user = await User.findOne({ email });
+        if (user) {
+            return res.status(400).json({ message: "This email is already registered. Please sign in." });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const name = email.split('@')[0];
+
+        user = await User.create({
+            email,
+            password: hashedPassword,
+            name: name
+        });
+
+        console.log(`✅ New local user created: ${email}`);
+
+        const sessionToken = jwt.sign(
+            { userId: user._id }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '90d' }
+        );
+
+        res.status(201).json({ token: sessionToken, user: { id: user._id, email: user.email, name: user.name } });
+    } catch (error) {
+        console.error("❌ Signup error:", error);
+        res.status(500).json({ message: "Server error during account creation." });
+    }
+});
+
+// ==========================================
+// 3. EMAIL/PASSWORD LOGIN ENDPOINT
+// ==========================================
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: "We couldn't find a sanctuary with this email or password." });
+        }
+
+        if (!user.password) {
+             return res.status(400).json({ message: "This account uses Google Sign-In. Please click 'Continue with Google'." });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: "We couldn't find a sanctuary with this email or password." });
+        }
+
+        console.log(`✅ Local user logged in: ${email}`);
+
+        const sessionToken = jwt.sign(
+            { userId: user._id }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '90d' }
+        );
+
+        res.json({ token: sessionToken, user: { id: user._id, email: user.email, name: user.name } });
+    } catch (error) {
+        console.error("❌ Login error:", error);
+        res.status(500).json({ message: "Server error during login." });
+    }
+});
+
 // 🔥 SUPER SECURE HELPER FUNCTION 🔥
 const getUserId = (req) => {
     if (!req.user) {
@@ -81,14 +152,15 @@ const getUserId = (req) => {
         return null;
     }
     
-    // Agar req.user ek string hai
     if (typeof req.user === 'string') return req.user;
     
-    // Agar req.user ek JWT object hai
     return req.user.userId || req.user.id || req.user._id || req.user.sub || null;
 };
 
-// Fetch all drafts
+// ==========================================
+// 📝 DRAFTS ROUTES
+// ==========================================
+
 app.get('/api/drafts', auth, async (req, res) => {
     try {
         const userId = getUserId(req);
@@ -105,7 +177,6 @@ app.get('/api/drafts', auth, async (req, res) => {
     }
 });
 
-// Create a brand new draft
 app.post('/api/drafts', auth, async (req, res) => {
     try {
         const userId = getUserId(req);
@@ -126,7 +197,6 @@ app.post('/api/drafts', auth, async (req, res) => {
     }
 });
 
-// Get specific draft
 app.get('/api/drafts/:id', auth, async (req, res) => {
     try {
         const userId = getUserId(req);
@@ -139,7 +209,22 @@ app.get('/api/drafts/:id', auth, async (req, res) => {
     }
 });
 
-// Master Update Route (Pin, Tags, Content)
+app.put('/api/drafts/reorder', auth, async (req, res) => {
+    try {
+        const userId = getUserId(req);
+        const { orderedIds } = req.body;
+        for (let i = 0; i < orderedIds.length; i++) {
+            await Draft.findOneAndUpdate(
+                { _id: orderedIds[i], user: userId },
+                { order: i }
+            );
+        }
+        res.status(200).json({ message: 'Manuscripts reordered successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to reorder manuscripts' });
+    }
+});
+
 app.put('/api/drafts/:id', auth, async (req, res) => {
   try {
     const userId = getUserId(req);
@@ -156,7 +241,6 @@ app.put('/api/drafts/:id', auth, async (req, res) => {
   }
 });
 
-// Delete draft
 app.delete('/api/drafts/:id', auth, async (req, res) => {
     try {
         const userId = getUserId(req);
@@ -169,7 +253,6 @@ app.delete('/api/drafts/:id', auth, async (req, res) => {
     }
 });
 
-// Move to Trash
 app.put('/api/drafts/:id/trash', auth, async (req, res) => {
   try {
     const userId = getUserId(req);
@@ -185,7 +268,6 @@ app.put('/api/drafts/:id/trash', auth, async (req, res) => {
   }
 });
 
-// Restore from Trash
 app.put('/api/drafts/:id/restore', auth, async (req, res) => {
   try {
     const userId = getUserId(req);
@@ -201,30 +283,25 @@ app.put('/api/drafts/:id/restore', auth, async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`🚀 Server is running on port ${PORT}`);
-});
-
 // ==========================================
 // 📁 PROJECTS (FOLDERS) ROUTES
 // ==========================================
 
-// Get all projects for user
 app.get('/api/folders', auth, async (req, res) => {
     try {
-        const folders = await Folder.find({ user: req.user.userId }).sort({ createdAt: -1 });
+        const userId = getUserId(req);
+        const folders = await Folder.find({ user: userId }).sort({ createdAt: -1 });
         res.status(200).json(folders);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch projects' });
     }
 });
 
-// Create a project
 app.post('/api/folders', auth, async (req, res) => {
     try {
+        const userId = getUserId(req);
         const newFolder = await Folder.create({
-            user: req.user.userId,
+            user: userId,
             name: req.body.name || 'Untitled Project',
             description: req.body.description || '',
             color: req.body.color || '#D4AF37'
@@ -235,11 +312,10 @@ app.post('/api/folders', auth, async (req, res) => {
     }
 });
 
-// Delete a project
 app.delete('/api/folders/:id', auth, async (req, res) => {
     try {
-        await Folder.findOneAndDelete({ _id: req.params.id, user: req.user.userId });
-        // Optional: unassign drafts from this folder
+        const userId = getUserId(req);
+        await Folder.findOneAndDelete({ _id: req.params.id, user: userId });
         await Draft.updateMany({ folder: req.params.id }, { folder: null });
         res.status(200).json({ message: 'Project deleted successfully' });
     } catch (error) {
@@ -247,26 +323,25 @@ app.delete('/api/folders/:id', auth, async (req, res) => {
     }
 });
 
-
 // ==========================================
 // 📖 STORY BIBLE (LORE) ROUTES
 // ==========================================
 
-// Get all lore entries
 app.get('/api/lore', auth, async (req, res) => {
     try {
-        const loreEntries = await Lore.find({ user: req.user.userId }).sort({ updatedAt: -1 });
+        const userId = getUserId(req);
+        const loreEntries = await Lore.find({ user: userId }).sort({ updatedAt: -1 });
         res.status(200).json(loreEntries);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch story bible entries' });
     }
 });
 
-// Create a lore entry
 app.post('/api/lore', auth, async (req, res) => {
     try {
+        const userId = getUserId(req);
         const newLore = await Lore.create({
-            user: req.user.userId,
+            user: userId,
             title: req.body.title || 'New Entry',
             category: req.body.category || 'Character',
             content: req.body.content || '',
@@ -278,12 +353,17 @@ app.post('/api/lore', auth, async (req, res) => {
     }
 });
 
-// Delete a lore entry
 app.delete('/api/lore/:id', auth, async (req, res) => {
     try {
-        await Lore.findOneAndDelete({ _id: req.params.id, user: req.user.userId });
+        const userId = getUserId(req);
+        await Lore.findOneAndDelete({ _id: req.params.id, user: userId });
         res.status(200).json({ message: 'Lore entry deleted successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete lore entry' });
     }
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
 });

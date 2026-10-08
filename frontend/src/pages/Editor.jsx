@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+
 import TopHeader from "../components/TopHeader";
 import FloatingToolbar from "../components/FloatingToolbar";
+import StoryBible from "../components/StoryBible";
 
-const API_BASE_URL = import.meta.env.DEV ? "http://localhost:5000" : "https://zendraft-bau8.onrender.com";
+const API_BASE_URL = import.meta.env.DEV
+  ? "http://localhost:5000"
+  : "https://zendraft-bau8.onrender.com";
 
 export default function Editor() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   const [title, setTitle] = useState("");
   const [saveStatus, setSaveStatus] = useState("Saved");
   const [isTyping, setIsTyping] = useState(false);
@@ -18,7 +22,11 @@ export default function Editor() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const [colorMenuObj, setColorMenuObj] = useState(null);
-  const [inlineMenu, setInlineMenu] = useState({ visible: false, x: 0, y: 0 });
+  const [inlineMenu, setInlineMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+  });
 
   const editorRef = useRef(null);
   const contentRef = useRef("");
@@ -26,7 +34,15 @@ export default function Editor() {
   const isInitialRender = useRef(true);
 
   const DAILY_GOAL = 1000;
-  const wordCount = contentRef.current ? contentRef.current.replace(/<[^>]*>?/gm, "").trim().split(/\s+/).filter(Boolean).length : 0;
+
+  const wordCount = contentRef.current
+    ? contentRef.current
+        .replace(/<[^>]*>?/gm, "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean).length
+    : 0;
+
   const readingTime = Math.max(1, Math.ceil(wordCount / 200));
   const progressPercentage = Math.min((wordCount / DAILY_GOAL) * 100, 100);
 
@@ -43,43 +59,96 @@ export default function Editor() {
     selectionText: isDarkMode ? "#FFFFFF" : "#000000",
   };
 
+  // 🔥 DYNAMIC TAB TITLE & URL SLUG LOGIC 🔥
+  useEffect(() => {
+    // 1. Update browser tab title dynamically
+    document.title = title ? `${title}` : "Untitled Draft";
+
+    // 2. Generate and update URL slug dynamically
+    if (title) {
+      const slug = title
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, "") // Remove special characters
+        .replace(/[\s-]+/g, "-"); // Replace spaces with hyphens
+
+      // Safely update browser URL without refreshing the page
+      window.history.replaceState(null, "", `/editor/${id}?draft=${slug}`);
+    } else {
+      window.history.replaceState(null, "", `/editor/${id}`);
+    }
+  }, [title, id]);
+
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem("zenToken");
+
       if (!token) return navigate("/");
 
       try {
-        const currRes = await axios.get(`${API_BASE_URL}/api/drafts/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+        const currRes = await axios.get(`${API_BASE_URL}/api/drafts/${id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
         setTitle(currRes.data.title || "");
+
         contentRef.current = currRes.data.content || "";
-        if (editorRef.current) editorRef.current.innerHTML = contentRef.current;
+
+        if (editorRef.current) {
+          editorRef.current.innerHTML = contentRef.current;
+        }
+
         setStoryNotes(currRes.data.notes || "");
       } catch (error) {
         console.error("Fetch Data Error:", error);
       }
     };
+
     fetchData();
   }, [id, navigate]);
 
   useEffect(() => {
-    if (isInitialRender.current) { isInitialRender.current = false; return; }
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+
     if (!title && !contentRef.current && !storyNotes) return;
 
     setSaveStatus("Saving...");
+
     const saveDebounce = setTimeout(async () => {
       const token = localStorage.getItem("zenToken");
+
       try {
-        await axios.put(`${API_BASE_URL}/api/drafts/${id}`, { title, content: contentRef.current, notes: storyNotes }, { headers: { Authorization: `Bearer ${token}` } });
+        await axios.put(
+          `${API_BASE_URL}/api/drafts/${id}`,
+          {
+            title,
+            content: contentRef.current,
+            notes: storyNotes,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
         setSaveStatus("Saved");
       } catch (error) {
         setSaveStatus("Offline");
       }
     }, 1500);
+
     return () => clearTimeout(saveDebounce);
   }, [title, contentRef.current, storyNotes, id]);
 
   const handleInput = (e) => {
     contentRef.current = e.currentTarget.innerHTML;
+
     triggerFocusMode();
     checkSelection();
   };
@@ -92,130 +161,281 @@ export default function Editor() {
   const triggerFocusMode = () => {
     setIsTyping(true);
     setColorMenuObj(null);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 2500);
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+    }, 2500);
   };
 
   const formatText = (command, val = null) => {
     document.execCommand(command, false, val);
+
     if (editorRef.current) {
       contentRef.current = editorRef.current.innerHTML;
       editorRef.current.focus();
       checkSelection();
     }
-    if (command === "foreColor" || command === "backColor" || command === "removeFormat") {
+
+    if (
+      command === "foreColor" ||
+      command === "backColor" ||
+      command === "removeFormat"
+    ) {
       window.getSelection().removeAllRanges();
-      setInlineMenu({ visible: false, x: 0, y: 0 });
+
+      setInlineMenu({
+        visible: false,
+        x: 0,
+        y: 0,
+      });
+
       setColorMenuObj(null);
     }
   };
 
   const checkSelection = () => {
     const selection = window.getSelection();
-    if (selection && selection.toString().trim().length > 0 && !selection.isCollapsed) {
+
+    if (
+      selection &&
+      selection.toString().trim().length > 0 &&
+      !selection.isCollapsed
+    ) {
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
-      if (editorRef.current && editorRef.current.contains(range.commonAncestorContainer)) {
-        setInlineMenu({ visible: true, x: rect.left + rect.width / 2, y: rect.top - 10 });
+
+      if (
+        editorRef.current &&
+        editorRef.current.contains(range.commonAncestorContainer)
+      ) {
+        setInlineMenu({
+          visible: true,
+          x: rect.left + rect.width / 2,
+          y: rect.top - 10,
+        });
+
         return;
       }
     }
-    setInlineMenu({ visible: false, x: 0, y: 0 });
+
+    setInlineMenu({
+      visible: false,
+      x: 0,
+      y: 0,
+    });
+
     setColorMenuObj(null);
   };
 
-  // 🔥 MASSIVE UPGRADE: Native PDF / Book Print Export 🔥
   const exportManuscript = () => {
-    const printWindow = window.open('', '', 'height=800,width=800');
-    const docTitle = title || 'Untitled Chapter';
-    
-    printWindow.document.write('<html><head><title>' + docTitle + '</title>');
+    const printWindow = window.open("", "", "height=800,width=800");
+
+    const docTitle = title || "Untitled Chapter";
+
+    printWindow.document.write("<html><head><title>" + docTitle + "</title>");
+
     printWindow.document.write(`
       <style>
-        body { 
-          font-family: 'Georgia', serif; 
-          max-width: 700px; 
-          margin: 0 auto; 
-          padding: 60px 40px; 
-          line-height: 2.2; 
-          color: #111; 
+        body {
+          font-family: 'Georgia', serif;
+          max-width: 700px;
+          margin: 0 auto;
+          padding: 60px 40px;
+          line-height: 2.2;
+          color: #111;
           font-size: 18px;
         }
-        h1 { 
-          text-align: center; 
-          font-size: 42px; 
-          font-weight: normal; 
-          margin-bottom: 60px; 
+
+        h1 {
+          text-align: center;
+          font-size: 42px;
+          font-weight: normal;
+          margin-bottom: 60px;
           letter-spacing: -0.5px;
         }
-        div { text-indent: 1.5em; margin-bottom: 0; }
-        div:first-child { text-indent: 0; }
-        hr { border: none; border-top: 1px solid #ccc; width: 50px; margin: 40px auto; }
+
+        div {
+          text-indent: 1.5em;
+          margin-bottom: 0;
+        }
+
+        div:first-child {
+          text-indent: 0;
+        }
+
+        hr {
+          border: none;
+          border-top: 1px solid #ccc;
+          width: 50px;
+          margin: 40px auto;
+        }
       </style>
     `);
-    printWindow.document.write('</head><body>');
-    printWindow.document.write('<h1>' + docTitle + '</h1>');
-    printWindow.document.write('<hr/>');
-    printWindow.document.write('<div>' + contentRef.current + '</div>');
-    printWindow.document.write('</body></html>');
-    
+
+    printWindow.document.write("</head><body>");
+    printWindow.document.write("<h1>" + docTitle + "</h1>");
+    printWindow.document.write("<hr/>");
+    printWindow.document.write("<div>" + contentRef.current + "</div>");
+    printWindow.document.write("</body></html>");
+
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => { printWindow.print(); }, 250);
+
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
   };
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-    else document.exitFullscreen();
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
   };
 
   return (
-    <div className={`min-h-screen ${theme.bgApp} ${theme.textMain} font-sans flex flex-col overflow-hidden transition-colors duration-500`} onMouseUp={checkSelection} onKeyUp={checkSelection}>
-      
-      {/* 🔥 CSS UPGRADES: Sleek Scrollbar & Typography 🔥 */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        ::selection { background: ${theme.selectionBg}; color: ${theme.selectionText}; }
-        
-        /* Sleek Mac-like Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background-color: ${isDarkMode ? '#333' : '#D0CCC5'}; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background-color: ${isDarkMode ? '#555' : '#A09D98'}; }
-        
-        .editor-content:empty:before { content: attr(data-placeholder); color: ${isDarkMode ? "#555" : "#D0CCC5"}; font-style: italic; }
-        .editor-content div { text-indent: 1.5em; margin-bottom: 0; line-height: 2.2; }
-        .editor-content div:first-child { text-indent: 0; }
-        .editor-content h2 { text-indent: 0; text-align: center; margin-top: 2.5rem; margin-bottom: 1.5rem; font-weight: normal; font-size: 1.6em; }
-        .editor-content[dir="rtl"] { text-align: right; }
-        .editor-content[dir="ltr"] { text-align: left; }
-      `}} />
+    <div
+      className={`min-h-screen ${theme.bgApp} ${theme.textMain} font-sans flex flex-col overflow-hidden transition-colors duration-500`}
+      onMouseUp={checkSelection}
+      onKeyUp={checkSelection}
+    >
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            ::selection {
+              background: ${theme.selectionBg};
+              color: ${theme.selectionText};
+            }
 
-      <TopHeader 
-        theme={theme} isTyping={isTyping} wordCount={wordCount} DAILY_GOAL={DAILY_GOAL} 
-        readingTime={readingTime} progressPercentage={progressPercentage} saveStatus={saveStatus} 
-        isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} 
-        exportManuscript={exportManuscript} toggleFullscreen={toggleFullscreen} isNotesOpen={isNotesOpen} setIsNotesOpen={setIsNotesOpen} 
+            ::-webkit-scrollbar {
+              width: 6px;
+            }
+
+            ::-webkit-scrollbar-track {
+              background: transparent;
+            }
+
+            ::-webkit-scrollbar-thumb {
+              background-color: ${isDarkMode ? "#333" : "#D0CCC5"};
+              border-radius: 10px;
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+              background-color: ${isDarkMode ? "#555" : "#A09D98"};
+            }
+
+            .editor-content:empty:before {
+              content: attr(data-placeholder);
+              color: ${isDarkMode ? "#555" : "#D0CCC5"};
+              font-style: italic;
+            }
+
+            .editor-content div {
+              text-indent: 1.5em;
+              margin-bottom: 0;
+              line-height: 2.2;
+            }
+
+            .editor-content div:first-child {
+              text-indent: 0;
+            }
+
+            .editor-content h2 {
+              text-indent: 0;
+              text-align: center;
+              margin-top: 2.5rem;
+              margin-bottom: 1.5rem;
+              font-weight: normal;
+              font-size: 1.6em;
+            }
+
+            .editor-content[dir="rtl"] {
+              text-align: right;
+            }
+
+            .editor-content[dir="ltr"] {
+              text-align: left;
+            }
+          `,
+        }}
       />
 
-      {/* STORY BIBLE DRAWER */}
-      <aside className={`fixed right-0 top-0 h-full w-80 ${theme.bgDrawer} border-l ${theme.border} shadow-xl z-40 flex flex-col transition-transform duration-500 ease-in-out ${isNotesOpen ? "translate-x-0" : "translate-x-full"}`}>
-        <textarea dir="auto" value={storyNotes} onChange={(e) => setStoryNotes(e.target.value)} placeholder="Jot down character details..." className={`flex-1 w-full bg-transparent resize-none p-6 mt-16 text-[16px] leading-relaxed ${theme.textMuted} focus:outline-none custom-scrollbar`} style={{ fontFamily: "'Newsreader', serif" }} />
-      </aside>
+      <TopHeader
+        theme={theme}
+        isTyping={isTyping}
+        wordCount={wordCount}
+        DAILY_GOAL={DAILY_GOAL}
+        readingTime={readingTime}
+        progressPercentage={progressPercentage}
+        saveStatus={saveStatus}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
+        exportManuscript={exportManuscript}
+        toggleFullscreen={toggleFullscreen}
+        isNotesOpen={isNotesOpen}
+        setIsNotesOpen={setIsNotesOpen}
+      />
 
-      <div className={`flex-1 flex flex-col w-full h-full overflow-y-auto transition-all duration-700 ${isNotesOpen ? "pr-80" : "pr-0"}`}>
-        <main className={`flex-1 w-full max-w-[720px] mx-auto px-8 pt-4 pb-48 flex flex-col z-10 relative`}>
-          
-          <input dir="auto" type="text" value={title} onChange={handleTitleChange} placeholder="Chapter Title" className={`w-full bg-transparent text-center text-[48px] sm:text-[56px] font-normal ${theme.textMain} focus:outline-none tracking-tight leading-tight mt-8`} style={{ fontFamily: "'Newsreader', serif" }} />
-          
-          {/* 🔥 Upgraded Divider Line 🔥 */}
-          <div className={`w-24 h-[2px] rounded-full mx-auto mt-10 mb-14 transition-colors ${isDarkMode ? "bg-[#333333]" : "bg-[#D4D0C8]"}`}></div>
-          
-          {/* 🔥 Increased Font Size (text-[22px]) 🔥 */}
-          <div ref={editorRef} dir="auto" contentEditable={true} suppressContentEditableWarning={true} onInput={handleInput} className={`editor-content w-full bg-transparent text-[20px] sm:text-[22px] ${theme.textMain} focus:outline-none outline-none min-h-[50vh] pb-32`} style={{ fontFamily: "'Newsreader', serif" }} data-placeholder="Start writing your story..." />
+      <StoryBible
+        theme={theme}
+        isNotesOpen={isNotesOpen}
+        storyNotes={storyNotes}
+        setStoryNotes={setStoryNotes}
+      />
+
+      <div
+        className={`flex-1 flex flex-col w-full h-full overflow-y-auto transition-all duration-700 ${
+          isNotesOpen ? "pr-80" : "pr-0"
+        }`}
+      >
+        <main className="flex-1 w-full max-w-[720px] mx-auto px-8 pt-4 pb-48 flex flex-col z-10 relative">
+          <input
+            dir="auto"
+            type="text"
+            value={title}
+            onChange={handleTitleChange}
+            placeholder="Chapter Title"
+            className={`w-full bg-transparent text-center text-[48px] sm:text-[56px] font-normal ${theme.textMain} focus:outline-none tracking-tight leading-tight mt-8`}
+            style={{
+              fontFamily: "'Newsreader', serif",
+            }}
+          />
+
+          <div
+            className={`w-24 h-[2px] rounded-full mx-auto mt-10 mb-14 transition-colors ${
+              isDarkMode ? "bg-[#333333]" : "bg-[#D4D0C8]"
+            }`}
+          ></div>
+
+          <div
+            ref={editorRef}
+            dir="auto"
+            contentEditable={true}
+            suppressContentEditableWarning={true}
+            onInput={handleInput}
+            className={`editor-content w-full bg-transparent text-[20px] sm:text-[22px] ${theme.textMain} focus:outline-none outline-none min-h-[50vh] pb-32`}
+            style={{
+              fontFamily: "'Newsreader', serif",
+            }}
+            data-placeholder="Start writing your story..."
+          />
         </main>
       </div>
 
-      <FloatingToolbar theme={theme} isDarkMode={isDarkMode} isTyping={isTyping} inlineMenu={inlineMenu} colorMenuObj={colorMenuObj} setColorMenuObj={setColorMenuObj} formatText={formatText} />
+      <FloatingToolbar
+        theme={theme}
+        isDarkMode={isDarkMode}
+        isTyping={isTyping}
+        inlineMenu={inlineMenu}
+        colorMenuObj={colorMenuObj}
+        setColorMenuObj={setColorMenuObj}
+        formatText={formatText}
+      />
     </div>
   );
 }

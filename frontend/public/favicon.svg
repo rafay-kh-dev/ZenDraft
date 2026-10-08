@@ -1,8 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <!-- Off-White Rounded Background -->
-  <rect width="24" height="24" rx="6" fill="#FDFCF8" />
-  <!-- Black Pen Nib -->
-  <path d="M12 4l4 4-7 12-4-4 7-12z" fill="#1A1A1A" />
-  <!-- Gold Accent -->
-  <path d="M16 8l4 4-2 2-4-4 2-2z" fill="#C9BAA3" />
+  <!-- Book Cover Base (Full Size, No Box) -->
+  <path d="M4 3.5C4 2.67157 4.67157 2 5.5 2H19C19.5523 2 20 2.44772 20 3V20.5C20 21.3284 19.3284 22 18.5 22H5.5C4.67157 22 4 21.3284 4 20.5V3.5Z" fill="#E5E0D5"/>
+  
+  {/* Spine shadow for depth */}
+  <path d="M4 3.5C4 2.67157 4.67157 2 5.5 2H8V22H5.5C4.67157 22 4 21.3284 4 20.5V3.5Z" fill="#2D2824"/>
+  
+  {/* Bold Gold Ribbon Bookmark (Extends slightly to catch attention) */}
+  <path d="M13 2H16.5V14L14.75 12L13 14V2Z" fill="#D4AF37"/>
+  
+  {/* Clear Minimalist Writing Lines */}
+  <rect x="10" y="7" width="6" height="2" rx="1" fill="#2D2824" opacity="0.85"/>
+  <rect x="10" y="11" width="4" height="2" rx="1" fill="#2D2824" opacity="0.85"/>
 </svg>
