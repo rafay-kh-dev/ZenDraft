@@ -1,4 +1,4 @@
-import { Routes, Route, useNavigate } from "react-router-dom";
+import { Routes, Route, useNavigate, Navigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 import { useEffect } from "react";
@@ -14,7 +14,12 @@ function Login() {
 
   useEffect(() => {
     document.title = "PenDraft | Sign In";
-  }, []);
+    // 🔥 AUTO-REDIRECT LOGIC 🔥
+    const existingToken = localStorage.getItem("zenToken");
+    if (existingToken) {
+      navigate("/desk");
+    }
+  }, [navigate]);
 
   const handleLoginSuccess = async (credentialResponse) => {
     try {
@@ -23,37 +28,62 @@ function Login() {
       });
 
       localStorage.setItem("zenToken", res.data.token);
-      navigate("/library");
+      navigate("/desk");
     } catch (error) {
       console.error("❌ Backend verification failed", error);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-900 font-sans">
-      <div className="bg-gray-800 p-10 rounded-2xl shadow-xl text-center border border-gray-700">
-        <h1 className="text-3xl font-bold text-white mb-2">PenDraft</h1>
-        <p className="text-gray-400 mb-8">
-          Your distraction-free writing space.
+    <div className="flex flex-col items-center justify-center h-screen bg-[#FDFCF8] font-sans">
+      <div className="text-center">
+        <h1 className="text-5xl text-[#2D2824] mb-4 font-serif font-medium tracking-tight">
+          PenDraft
+        </h1>
+        <p className="text-[#8C8781] mb-12 text-[15px] font-sans font-light">
+          Your minimalist writing studio.
         </p>
-
-        <GoogleLogin
-          onSuccess={handleLoginSuccess}
-          onError={() => console.error("❌ Login Failed")}
-          theme="filled_black"
-          shape="rectangular"
-        />
+        <div className="flex justify-center shadow-[0_8px_30px_rgba(0,0,0,0.06)] rounded-lg overflow-hidden">
+          <GoogleLogin
+            onSuccess={handleLoginSuccess}
+            onError={() => console.error("❌ Login Failed")}
+            theme="outline"
+            shape="rectangular"
+            size="large"
+          />
+        </div>
       </div>
     </div>
   );
+}
+
+// 🔥 PROTECTED ROUTE 🔥
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem("zenToken");
+  if (!token) return <Navigate to="/" replace />;
+  return children;
 }
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
-      <Route path="/library" element={<Dashboard />} />
-      <Route path="/editor/:id" element={<Editor />} />
+      <Route
+        path="/desk"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/editor/:id"
+        element={
+          <ProtectedRoute>
+            <Editor />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }

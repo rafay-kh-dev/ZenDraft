@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import AuthorSidebar from "../components/AuthorSidebar";
 
 const API_BASE_URL = import.meta.env.DEV
   ? "http://localhost:5000"
@@ -9,15 +10,23 @@ const API_BASE_URL = import.meta.env.DEV
 export default function Dashboard() {
   const [allDrafts, setAllDrafts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentView, setCurrentView] = useState("library"); // 'library' or 'trash'
+  const [currentView, setCurrentView] = useState("desk");
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
+  const [modal, setModal] = useState({
+    isOpen: false,
+    type: "confirm",
+    title: "",
+    message: "",
+    inputValue: "",
+    onConfirm: null,
+  });
+
   useEffect(() => {
-    // 🔥 Updated tab title to show website name properly
-    document.title = "My Library | PenDraft";
+    document.title = "Studio | PenDraft";
     fetchDrafts();
-  }, [navigate]);
+  }, []);
 
   const fetchDrafts = async () => {
     const token = localStorage.getItem("zenToken");
@@ -26,7 +35,9 @@ export default function Dashboard() {
       const res = await axios.get(`${API_BASE_URL}/api/drafts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const sortedDrafts = res.data.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      const sortedDrafts = res.data.sort(
+        (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
+      );
       setAllDrafts(sortedDrafts);
     } catch (error) {
       if (error.response?.status === 401) {
@@ -39,9 +50,13 @@ export default function Dashboard() {
   };
 
   const updateDraftAttribute = async (id, attributesObj, e) => {
-    if(e) e.stopPropagation();
+    if (e) e.stopPropagation();
     const token = localStorage.getItem("zenToken");
-    setAllDrafts(allDrafts.map(draft => draft._id === id ? { ...draft, ...attributesObj } : draft));
+    setAllDrafts(
+      allDrafts.map((draft) =>
+        draft._id === id ? { ...draft, ...attributesObj } : draft,
+      ),
+    );
     try {
       await axios.put(`${API_BASE_URL}/api/drafts/${id}`, attributesObj, {
         headers: { Authorization: `Bearer ${token}` },
@@ -56,244 +71,445 @@ export default function Dashboard() {
     try {
       const res = await axios.post(
         `${API_BASE_URL}/api/drafts`,
-        { title: "", content: "" },
+        { title: "", content: "", status: "Outline" },
         { headers: { Authorization: `Bearer ${token}` } },
       );
       navigate(`/editor/${res.data._id}`);
     } catch (error) {
-      console.error("Error creating chapter:", error);
+      console.error("Error creating manuscript:", error);
     }
   };
 
-  const permanentDelete = async (id, e) => {
-    e.stopPropagation();
-    const confirmDelete = window.confirm("Are you sure you want to PERMANENTLY delete this chapter? This cannot be undone.");
-    if (!confirmDelete) return;
+  const closeModal = () => setModal({ ...modal, isOpen: false });
 
-    const token = localStorage.getItem("zenToken");
-    try {
-      await axios.delete(`${API_BASE_URL}/api/drafts/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setAllDrafts(allDrafts.filter((draft) => draft._id !== id));
-    } catch (error) {
-      console.error("Error permanently deleting:", error);
-    }
+  const confirmSignOut = () => {
+    setModal({
+      isOpen: true,
+      type: "confirm",
+      title: "Leave Studio",
+      message: "Are you ready to step away from your desk?",
+      onConfirm: () => {
+        localStorage.removeItem("zenToken");
+        navigate("/");
+      },
+    });
   };
 
-  const handleAddTag = (id, currentTags, e) => {
+  const confirmMoveToTrash = (id, e) => {
     e.stopPropagation();
-    const newTag = window.prompt("Enter a new tag (e.g., 'Draft', 'Character', 'Ideas'):");
-    if (newTag && newTag.trim() !== "") {
-      const updatedTags = [...(currentTags || []), newTag.trim()];
-      updateDraftAttribute(id, { tags: updatedTags }, null);
-    }
+    setModal({
+      isOpen: true,
+      type: "danger",
+      title: "Discard Manuscript",
+      message: "Toss this manuscript into the wastebasket?",
+      onConfirm: () => {
+        updateDraftAttribute(id, { isTrashed: true, isPinned: false }, null);
+        closeModal();
+      },
+    });
   };
 
-  const handleRemoveTag = (id, currentTags, tagToRemove, e) => {
+  const confirmRestore = (id, e) => {
     e.stopPropagation();
-    const updatedTags = currentTags.filter(t => t !== tagToRemove);
-    updateDraftAttribute(id, { tags: updatedTags }, null);
+    setModal({
+      isOpen: true,
+      type: "confirm",
+      title: "Recover Manuscript",
+      message: "Bring this manuscript back to your desk?",
+      onConfirm: () => {
+        updateDraftAttribute(id, { isTrashed: false }, null);
+        closeModal();
+      },
+    });
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("zenToken");
-    navigate("/");
+  const confirmPermanentDelete = (id, e) => {
+    e.stopPropagation();
+    setModal({
+      isOpen: true,
+      type: "danger",
+      title: "Burn Manuscript",
+      message: "This manuscript will be destroyed permanently. Proceed?",
+      onConfirm: async () => {
+        const token = localStorage.getItem("zenToken");
+        try {
+          await axios.delete(`${API_BASE_URL}/api/drafts/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setAllDrafts(allDrafts.filter((draft) => draft._id !== id));
+          closeModal();
+        } catch (error) {
+          console.error("Delete failed:", error);
+        }
+      },
+    });
   };
 
   const stripHtml = (html) => {
-    if (!html) return "No content written yet...";
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const text = doc.body.textContent || "";
-    return text.trim() ? text.substring(0, 120) + "..." : "No content written yet...";
+    if (!html) return "Blank page...";
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    return (doc.body.textContent || "").trim() || "Blank page...";
   };
 
-  const filteredDrafts = allDrafts.filter(draft => {
+  const getWordCount = (html) => {
+    if (!html) return 0;
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    return (doc.body.textContent || "")
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length;
+  };
+
+  // 🔥 DAILY GOAL LOGIC 🔥
+  const today = new Date().setHours(0, 0, 0, 0);
+  const todayDrafts = allDrafts.filter(
+    (d) => new Date(d.updatedAt).setHours(0, 0, 0, 0) === today,
+  );
+  const wordsToday = todayDrafts.reduce(
+    (sum, draft) => sum + getWordCount(draft.content),
+    0,
+  );
+  const dailyGoal = 1000;
+  const goalProgress = Math.min((wordsToday / dailyGoal) * 100, 100);
+
+  const filteredDrafts = allDrafts.filter((draft) => {
     const searchLower = searchQuery.toLowerCase();
-    const titleMatch = (draft.title || "").toLowerCase().includes(searchLower);
-    const contentMatch = (draft.content || "").toLowerCase().includes(searchLower);
-    const tagMatch = (draft.tags || []).some(t => t.toLowerCase().includes(searchLower));
-    return titleMatch || contentMatch || tagMatch;
+    return (
+      (draft.title || "").toLowerCase().includes(searchLower) ||
+      (draft.content || "").toLowerCase().includes(searchLower)
+    );
   });
 
-  const trashedDrafts = filteredDrafts.filter(draft => draft.isTrashed);
-  const activeDrafts = filteredDrafts.filter(draft => !draft.isTrashed);
-  const pinnedDrafts = activeDrafts.filter(draft => draft.isPinned);
-  const unpinnedDrafts = activeDrafts.filter(draft => !draft.isPinned);
+  const trashedDrafts = filteredDrafts.filter((draft) => draft.isTrashed);
+  const activeDrafts = filteredDrafts.filter((draft) => !draft.isTrashed);
+  const pinnedDrafts = activeDrafts.filter((draft) => draft.isPinned);
+  const unpinnedDrafts = activeDrafts.filter((draft) => !draft.isPinned);
 
-  const renderDraftList = (draftList, isTrashView = false, isPinnedSection = false) => {
-    if (draftList.length === 0 && !isLoading && !isPinnedSection) {
-       return (
-         <div className="text-center py-16 border border-dashed border-[#D4D0C8] rounded-xl bg-[#F4F3EE]">
-           <p className="text-[#8C8781] text-[18px] font-serif italic">
-             {searchQuery ? "No matching manuscripts found." : isTrashView ? "Your recycle bin is empty." : "Your library is waiting for its first words."}
-           </p>
-         </div>
-       );
+  const renderGrid = (draftList, isTrashView = false) => {
+    if (draftList.length === 0 && !isLoading) {
+      return (
+        <div className="col-span-full flex flex-col items-center justify-center py-20 text-[#A39A8E]">
+          <p className="text-[18px] font-serif italic tracking-wide">
+            {isTrashView
+              ? "The wastebasket is empty."
+              : "Your desk is clear. Time to write."}
+          </p>
+        </div>
+      );
     }
 
-    return draftList.map((draft, index) => (
-      <div
-        key={draft._id}
-        onClick={() => !isTrashView ? navigate(`/editor/${draft._id}`) : null}
-        className={`group flex items-center justify-between py-5 border-b border-[#E8E5DF] last:border-none transition-all duration-300 ${!isTrashView ? 'cursor-pointer hover:bg-white hover:-mx-4 hover:px-4 rounded-xl hover:shadow-[0_4px_20px_rgb(0,0,0,0.03)]' : 'opacity-80'}`}
-      >
-        <div className="flex items-start gap-5 flex-1 min-w-0 pr-6">
-          <span className={`text-[16px] font-serif italic mt-1 w-6 text-right shrink-0 ${isTrashView ? 'text-[#D4D0C8]' : 'text-[#A39E98]'}`}>
-            {draftList.length - index}.
-          </span>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-1.5">
-              <h2 className={`text-[20px] transition-colors leading-snug truncate ${isTrashView ? 'text-[#8C8781]' : 'text-[#1A1A1A] group-hover:text-[#4A4742]'}`} style={{ fontFamily: "'Newsreader', serif" }}>
-                {draft.title || "Untitled Chapter"}
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+        {draftList.map((draft) => (
+          <div
+            key={draft._id}
+            onClick={() =>
+              !isTrashView ? navigate(`/editor/${draft._id}`) : null
+            }
+            className={`group relative flex flex-col justify-between p-7 h-[250px] transition-all duration-500 ease-out rounded-xl ${!isTrashView ? "bg-[#FFFFFF] cursor-pointer shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-[#F2EFE9] hover:shadow-[0_10px_30px_rgba(0,0,0,0.06)] hover:-translate-y-1.5 hover:border-[#E8E4DB]" : "bg-transparent border border-[#E8E4DB] opacity-60"}`}
+          >
+            <div className="flex justify-between items-start mb-4">
+              {!isTrashView ? (
+                <div onClick={(e) => e.stopPropagation()} className="relative">
+                  <select
+                    value={draft.status || "Outline"}
+                    onChange={(e) =>
+                      updateDraftAttribute(
+                        draft._id,
+                        { status: e.target.value },
+                        e,
+                      )
+                    }
+                    className="appearance-none outline-none cursor-pointer text-[10px] font-sans font-bold text-[#A39A8E] hover:text-[#2D2824] uppercase tracking-widest bg-transparent transition-colors"
+                  >
+                    <option value="Outline">Outline</option>
+                    <option value="Drafting">Drafting</option>
+                    <option value="Editing">Editing</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
+              ) : (
+                <span className="text-[10px] font-sans font-bold text-[#C95C5C] uppercase tracking-widest">
+                  Discarded
+                </span>
+              )}
+
+              {!isTrashView && (
+                <button
+                  onClick={(e) =>
+                    updateDraftAttribute(
+                      draft._id,
+                      { isPinned: !draft.isPinned },
+                      e,
+                    )
+                  }
+                  className={`p-1 transition-all cursor-pointer ${draft.isPinned ? "text-[#D4AF37]" : "text-[#DCD8D0] hover:text-[#2D2824] opacity-0 group-hover:opacity-100"}`}
+                  title={draft.isPinned ? "Unpin" : "Pin"}
+                >
+                  <svg
+                    className="w-[18px] h-[18px]"
+                    fill={draft.isPinned ? "currentColor" : "none"}
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-hidden relative pr-2">
+              <h2 className="text-[22px] text-[#2D2824] leading-snug mb-3 line-clamp-2 font-serif font-medium tracking-tight">
+                {draft.title || "Untitled Manuscript"}
               </h2>
-              <div className="flex items-center gap-1.5 hidden sm:flex">
-                {(draft.tags || []).map((tag, i) => (
-                  <span key={i} className="flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#F0EFEA] border border-[#E8E5DF] text-[#5C5954] text-[11px] font-medium tracking-wide uppercase">
-                    {tag}
-                    {!isTrashView && (
-                      <button onClick={(e) => handleRemoveTag(draft._id, draft.tags, tag, e)} className="hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-1">×</button>
-                    )}
-                  </span>
-                ))}
+              <p className="text-[14px] text-[#7A746D] leading-relaxed line-clamp-3 font-sans font-light">
+                {stripHtml(draft.content)}
+              </p>
+              <div className="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-t from-white to-transparent"></div>
+            </div>
+
+            <div className="flex items-center justify-between mt-5 pt-3 border-t border-[#F9F8F5]">
+              <span className="text-[10px] font-sans text-[#B3ADA4] uppercase tracking-widest font-medium">
+                {new Date(draft.updatedAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
+              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                {!isTrashView ? (
+                  <button
+                    onClick={(e) => confirmMoveToTrash(draft._id, e)}
+                    className="text-[#A39A8E] hover:text-[#C95C5C] transition-colors cursor-pointer ml-1"
+                    title="Discard"
+                  >
+                    <svg
+                      className="w-[16px] h-[16px]"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={(e) => confirmRestore(draft._id, e)}
+                      className="text-[#A39A8E] hover:text-[#2D2824] transition-colors cursor-pointer"
+                      title="Recover"
+                    >
+                      <svg
+                        className="w-[16px] h-[16px]"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => confirmPermanentDelete(draft._id, e)}
+                      className="text-[#A39A8E] hover:text-[#C95C5C] transition-colors cursor-pointer ml-1"
+                      title="Burn"
+                    >
+                      <svg
+                        className="w-[16px] h-[16px]"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
-            <p className="text-[14px] font-sans text-[#A39E98] truncate opacity-90">
-              {stripHtml(draft.content)}
-            </p>
           </div>
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="text-[11px] font-sans font-medium text-[#A39E98] uppercase tracking-wider hidden md:block mr-2">
-            {new Date(draft.updatedAt).toLocaleDateString("en-AU", { month: "short", day: "numeric" })}
-          </span>
-
-          {!isTrashView ? (
-            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <button onClick={(e) => handleAddTag(draft._id, draft.tags, e)} className="p-2 text-[#A39E98] hover:text-[#4A4742] hover:bg-[#F4F3EE] rounded-md transition-all" title="Add Tag">
-                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-              </button>
-              <button onClick={(e) => updateDraftAttribute(draft._id, { isPinned: !draft.isPinned }, e)} className={`p-2 rounded-md transition-all ${draft.isPinned ? 'text-[#EAB308] bg-[#FEF9C3]' : 'text-[#A39E98] hover:text-[#EAB308] hover:bg-[#FEF9C3]'}`} title={draft.isPinned ? "Unpin" : "Pin Chapter"}>
-                <svg className="w-[18px] h-[18px]" fill={draft.isPinned ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
-              </button>
-              <button onClick={(e) => updateDraftAttribute(draft._id, { isTrashed: true, isPinned: false }, e)} className="p-2 text-[#A39E98] hover:text-[#C95C5C] hover:bg-[#FFF5F5] rounded-md transition-all ml-1" title="Move to trash">
-                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <button onClick={(e) => updateDraftAttribute(draft._id, { isTrashed: false }, e)} className="p-2 text-[#8C8781] hover:text-[#10B981] hover:bg-[#ECFDF5] rounded-md transition-all" title="Restore chapter">
-                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
-              </button>
-              <button onClick={(e) => permanentDelete(draft._id, e)} className="p-2 text-[#8C8781] hover:text-white hover:bg-[#C95C5C] rounded-md transition-all" title="Delete permanently">
-                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              </button>
-            </div>
-          )}
-        </div>
+        ))}
       </div>
-    ));
+    );
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF9F5] text-[#1A1A1A] selection:bg-[#E5E0D5]">
-      
-      <header className="w-full border-b border-[#E8E5DF] bg-[#FAF9F5]/90 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3 w-1/4">
-            <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2l4 4-7 14-4-4 7-14z" fill="#1A1A1A" />
-              <path d="M16 6l4 4-2 2-4-4 2-2z" fill="#C9BAA3" />
-            </svg>
-            <span className="font-serif italic text-[19px] text-[#2C2B29] font-medium tracking-tight">PenDraft</span>
-          </div>
+    <div className="min-h-screen bg-[#FDFCF8] text-[#2D2824] selection:bg-[#F2EFE9] flex">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap');
+        .font-serif { font-family: 'Lora', serif; }
+        .font-sans { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { display: none; }
+        .animate-fade-in { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes fadeIn { 0% { opacity: 0; transform: translateY(8px); } 100% { opacity: 1; transform: translateY(0); } }
+      `}</style>
 
-          <div className="flex-1 flex justify-center max-w-lg">
-             <div className="relative w-full">
-                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A39E98]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                <input 
-                  type="text" 
-                  placeholder="Search by title, content, or tags..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-[#F4F3EE] hover:bg-[#EAE8E3] focus:bg-white border border-transparent focus:border-[#D4D0C8] rounded-full py-2 pl-11 pr-4 text-[13px] text-[#1A1A1A] placeholder-[#A39E98] transition-all outline-none shadow-inner"
-                />
-             </div>
-          </div>
+      {/* Sidebar Component */}
+      <AuthorSidebar
+        currentView={currentView}
+        setCurrentView={setCurrentView}
+        confirmSignOut={confirmSignOut}
+      />
 
-          <div className="w-1/4 flex justify-end">
-            <button onClick={handleLogout} className="text-[11px] font-sans uppercase tracking-[0.15em] font-medium text-[#8C8781] hover:text-[#1A1A1A] transition-colors bg-white px-4 py-1.5 rounded-full border border-[#E8E5DF] shadow-sm">
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-6 pt-16 pb-32 w-full">
-        
-        <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
-          <div>
-            <h1 className="text-4xl md:text-5xl text-[#1A1A1A] tracking-tight leading-tight transition-all" style={{ fontFamily: "'Newsreader', serif" }}>
-              {currentView === 'trash' ? 'Trashed Entries' : 'Library'}
-            </h1>
-          </div>
-          
-          {currentView === 'library' && (
-            <button onClick={createNewChapter} className="group flex items-center gap-2.5 text-white bg-[#1A1A1A] px-6 py-2.5 rounded-full hover:bg-[#333333] hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              <span className="font-sans text-[13px] font-medium tracking-wide">Write</span>
-            </button>
-          )}
-        </div>
-
-        <div className="flex justify-between items-center mb-6 border-b border-[#E8E5DF] pb-4">
-          <div className="flex gap-6">
-            <button onClick={() => setCurrentView('library')} className={`text-[12px] font-semibold uppercase tracking-wider transition-colors ${currentView === 'library' ? 'text-[#1A1A1A] border-b-2 border-[#1A1A1A] pb-1' : 'text-[#A39E98] hover:text-[#5C5954]'}`}>
-              Active Drafts ({activeDrafts.length})
-            </button>
-            <button onClick={() => setCurrentView('trash')} className={`text-[12px] font-semibold uppercase tracking-wider transition-colors flex items-center gap-1.5 ${currentView === 'trash' ? 'text-[#C95C5C] border-b-2 border-[#C95C5C] pb-1' : 'text-[#A39E98] hover:text-[#C95C5C]'}`}>
-              Trash ({trashedDrafts.length})
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-col">
-          {isLoading ? (
-            <div className="text-center py-16">
-               <div className="animate-pulse flex flex-col items-center gap-4">
-                  <div className="h-3 bg-[#E8E5DF] rounded w-1/6"></div>
-                  <div className="h-3 bg-[#E8E5DF] rounded w-1/3"></div>
-               </div>
+      {/* Modals */}
+      {modal.isOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#FDFCF8]/90 backdrop-blur-sm p-4"
+          onClick={closeModal}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.04)] border border-[#F2EFE9] w-full max-w-[420px] p-10 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-[26px] text-[#2D2824] mb-3 font-serif font-medium">
+              {modal.title}
+            </h2>
+            <p className="text-[#7A746D] text-[15px] leading-relaxed mb-8 font-sans font-light">
+              {modal.message}
+            </p>
+            <div className="flex items-center justify-center gap-6 mt-8">
+              <button
+                onClick={closeModal}
+                className="text-[11px] font-sans font-bold tracking-widest uppercase text-[#A39A8E] hover:text-[#2D2824] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => modal.onConfirm()}
+                className={`text-[11px] font-sans font-bold tracking-widest uppercase transition-colors cursor-pointer ${modal.type === "danger" ? "text-[#C95C5C] hover:text-red-800" : "text-[#2D2824] hover:text-black"}`}
+              >
+                {modal.type === "danger" ? "Proceed" : "Confirm"}
+              </button>
             </div>
-          ) : currentView === 'trash' ? (
-            renderDraftList(trashedDrafts, true)
-          ) : (
-            <>
-              {pinnedDrafts.length > 0 && (
-                <div className="mb-8">
-                  <div className="flex items-center gap-2 mb-2 px-2 text-[#EAB308]">
-                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
-                     <span className="text-[11px] font-bold uppercase tracking-widest">Pinned</span>
-                  </div>
-                  <div className="bg-white rounded-2xl p-2 shadow-sm border border-[#E8E5DF]">
-                    {renderDraftList(pinnedDrafts, false, true)}
-                  </div>
-                </div>
-              )}
-              
-              <div className="px-2">
-                 {pinnedDrafts.length > 0 && unpinnedDrafts.length > 0 && (
-                   <span className="text-[11px] font-bold uppercase tracking-widest text-[#A39E98] mb-4 block">Recent Drafts</span>
-                 )}
-                 {renderDraftList(unpinnedDrafts, false)}
-              </div>
-            </>
-          )}
+          </div>
         </div>
-      </main>
+      )}
+
+      {/* Main Content Area */}
+      <div className="flex-1 ml-[260px]">
+        {/* Top Header */}
+        <header className="h-[90px] flex items-center justify-between px-12 border-b border-transparent">
+          <div className="w-[300px] relative group">
+            <input
+              type="text"
+              placeholder="Search your writing..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent focus:bg-white focus:shadow-sm border border-transparent focus:border-[#E8E4DB] rounded-full py-2 px-4 text-[14px] font-sans text-[#2D2824] placeholder-[#B3ADA4] transition-all outline-none"
+            />
+          </div>
+
+          {/* 🔥 DAILY GOAL TRACKER 🔥 */}
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] font-sans font-bold tracking-[0.15em] uppercase text-[#A39A8E] mb-1">
+                Daily Goal
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-sans font-semibold text-[#2D2824]">
+                  {wordsToday}{" "}
+                  <span className="text-[#B3ADA4] font-normal">
+                    / {dailyGoal}
+                  </span>
+                </span>
+                <div className="w-24 h-1.5 bg-[#F2EFE9] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#D4AF37] transition-all duration-1000"
+                    style={{ width: `${goalProgress}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Dynamic Studio Content */}
+        <main className="px-12 pt-8 pb-32 max-w-[1200px]">
+          {currentView === "projects" || currentView === "bible" ? (
+            <div className="flex flex-col items-center justify-center py-32 text-center animate-fade-in">
+              <span className="text-[12px] font-bold tracking-[0.3em] uppercase text-[#D4AF37] mb-4 block">
+                Coming Soon
+              </span>
+              <h2 className="text-[42px] text-[#2D2824] mb-4 font-serif font-medium">
+                This module is under construction
+              </h2>
+              <p className="text-[#8C8781] text-[15px] font-sans max-w-md">
+                Backend database schemas for{" "}
+                {currentView === "projects" ? "Project Folders" : "Story Lore"}{" "}
+                are being prepared.
+              </p>
+            </div>
+          ) : (
+            <div className="animate-fade-in">
+              <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
+                <div>
+                  <h2 className="text-[46px] text-[#2D2824] tracking-tight leading-none font-serif font-medium">
+                    {currentView === "wastebasket" ? "Wastebasket" : "My Desk"}
+                  </h2>
+                </div>
+                {currentView === "desk" && (
+                  <button
+                    onClick={createNewChapter}
+                    className="text-[11px] font-sans font-bold tracking-widest uppercase text-[#FDFCF8] bg-[#2D2824] px-7 py-3.5 rounded-full hover:bg-black hover:shadow-xl hover:-translate-y-1 transition-all duration-400 cursor-pointer"
+                  >
+                    New Manuscript
+                  </button>
+                )}
+              </div>
+
+              {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="bg-white rounded-xl h-[250px] animate-pulse border border-[#F2EFE9]"
+                    ></div>
+                  ))}
+                </div>
+              ) : currentView === "wastebasket" ? (
+                renderGrid(trashedDrafts, true)
+              ) : (
+                <>
+                  {pinnedDrafts.length > 0 && (
+                    <div className="mb-16">
+                      <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#D4AF37] mb-6 block ml-1">
+                        Pinned
+                      </span>
+                      {renderGrid(pinnedDrafts, false, true)}
+                    </div>
+                  )}
+                  <div>
+                    {pinnedDrafts.length > 0 && unpinnedDrafts.length > 0 && (
+                      <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-6 block ml-1">
+                        Everything Else
+                      </span>
+                    )}
+                    {renderGrid(unpinnedDrafts, false)}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

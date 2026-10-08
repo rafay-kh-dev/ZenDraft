@@ -10,7 +10,6 @@ const auth = require('./middleware/auth');
 const app = express();
 app.use(express.json());
 
-// Dynamic CORS Setup
 const allowedOrigins = [
     'http://localhost:5173', 
     'https://zendraft.codelume.online'
@@ -27,12 +26,10 @@ app.use(cors({
     credentials: true
 }));
 
-// Database Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected Successfully!'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// User Schema
 const UserSchema = new mongoose.Schema({
     googleId: String,
     email: String,
@@ -41,7 +38,6 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// Google Auth Route
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 app.post('/api/auth/google', async (req, res) => {
@@ -66,7 +62,7 @@ app.post('/api/auth/google', async (req, res) => {
         const sessionToken = jwt.sign(
             { userId: user._id }, 
             process.env.JWT_SECRET, 
-            { expiresIn: '7d' }
+            { expiresIn: '90d' }
         );
 
         res.status(200).json({ token: sessionToken, user });
@@ -76,95 +72,129 @@ app.post('/api/auth/google', async (req, res) => {
     }
 });
 
-// Fetch all drafts for the logged-in user
+// 🔥 SUPER SECURE HELPER FUNCTION 🔥
+const getUserId = (req) => {
+    if (!req.user) {
+        console.log("❌ req.user is undefined in middleware");
+        return null;
+    }
+    
+    // Agar req.user ek string hai
+    if (typeof req.user === 'string') return req.user;
+    
+    // Agar req.user ek JWT object hai
+    return req.user.userId || req.user.id || req.user._id || req.user.sub || null;
+};
+
+// Fetch all drafts
 app.get('/api/drafts', auth, async (req, res) => {
     try {
-        const drafts = await Draft.find({ user: req.user.userId }).sort({ updatedAt: -1 });
+        const userId = getUserId(req);
+        if (!userId) {
+            console.log("❌ Fetch Drafts: User ID could not be parsed from token");
+            return res.status(401).json({ error: 'User ID missing in token' });
+        }
+
+        const drafts = await Draft.find({ user: userId }).sort({ updatedAt: -1 });
         res.status(200).json(drafts);
     } catch (error) {
         console.error('❌ Error fetching drafts:', error);
-        res.status(500).json({ error: 'Failed to fetch drafts' });
+        res.status(500).json({ error: 'Failed to fetch drafts', details: error.message });
     }
 });
 
 // Create a brand new draft
 app.post('/api/drafts', auth, async (req, res) => {
     try {
+        const userId = getUserId(req);
+        if (!userId) {
+            console.log("❌ Create Draft: User ID could not be parsed from token");
+            return res.status(401).json({ error: 'User ID missing in token' });
+        }
+
         const newDraft = await Draft.create({
-            user: req.user.userId,
+            user: userId,
             title: req.body.title || 'Untitled Draft',
             content: req.body.content || ''
         });
         res.status(201).json(newDraft);
     } catch (error) {
         console.error('❌ Error creating draft:', error);
-        res.status(500).json({ error: 'Failed to create draft' });
+        res.status(500).json({ error: 'Failed to create draft', details: error.message });
     }
 });
 
-// Kisi ek specific draft ko open karne ke liye
+// Get specific draft
 app.get('/api/drafts/:id', auth, async (req, res) => {
     try {
-        const draft = await Draft.findOne({ _id: req.params.id, user: req.user.userId });
+        const userId = getUserId(req);
+        const draft = await Draft.findOne({ _id: req.params.id, user: userId });
         if (!draft) return res.status(404).json({ error: 'Draft not found' });
         res.status(200).json(draft);
     } catch (error) {
+        console.error('❌ Error fetching specific draft:', error);
         res.status(500).json({ error: 'Error fetching draft' });
     }
 });
 
-app.put('/api/drafts/:id', authenticate, async (req, res) => {
+// Master Update Route (Pin, Tags, Content)
+app.put('/api/drafts/:id', auth, async (req, res) => {
   try {
-    // req.body mein ab chahe Pin aaye, Tag aaye ya Trash, sab auto-update ho jayega
-    const draft = await Draft.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const userId = getUserId(req);
+    const draft = await Draft.findOneAndUpdate(
+        { _id: req.params.id, user: userId }, 
+        req.body, 
+        { new: true }
+    );
+    if (!draft) return res.status(404).json({ error: 'Draft not found or unauthorized' });
     res.json(draft);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error during update" });
+    console.error('❌ Error updating draft:', err);
+    res.status(500).json({ error: "Server error during update", details: err.message });
   }
 });
 
-// Draft ko delete karne ke liye
+// Delete draft
 app.delete('/api/drafts/:id', auth, async (req, res) => {
     try {
-        const deletedDraft = await Draft.findOneAndDelete({ _id: req.params.id, user: req.user.userId });
+        const userId = getUserId(req);
+        const deletedDraft = await Draft.findOneAndDelete({ _id: req.params.id, user: userId });
         if (!deletedDraft) return res.status(404).json({ error: 'Draft not found' });
         res.status(200).json({ message: 'Draft deleted successfully' });
     } catch (error) {
+        console.error('❌ Error deleting draft:', error);
         res.status(500).json({ error: 'Error deleting draft' });
     }
 });
 
-// ==========================================
-// 🗑️ MOVE TO TRASH (SOFT DELETE)
-// ==========================================
-app.put('/api/drafts/:id/trash', authenticate, async (req, res) => {
+// Move to Trash
+app.put('/api/drafts/:id/trash', auth, async (req, res) => {
   try {
-    const draft = await Draft.findByIdAndUpdate(
-      req.params.id, 
+    const userId = getUserId(req);
+    const draft = await Draft.findOneAndUpdate(
+      { _id: req.params.id, user: userId }, 
       { isTrashed: true }, 
       { new: true }
     );
     res.json(draft);
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error moving to trash:', err);
     res.status(500).json({ error: "Server error during trash" });
   }
 });
 
-// ==========================================
-// ♻️ RESTORE FROM TRASH
-// ==========================================
-app.put('/api/drafts/:id/restore', authenticate, async (req, res) => {
+// Restore from Trash
+app.put('/api/drafts/:id/restore', auth, async (req, res) => {
   try {
-    const draft = await Draft.findByIdAndUpdate(
-      req.params.id, 
+    const userId = getUserId(req);
+    const draft = await Draft.findOneAndUpdate(
+      { _id: req.params.id, user: userId }, 
       { isTrashed: false }, 
       { new: true }
     );
     res.json(draft);
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error restoring from trash:', err);
     res.status(500).json({ error: "Server error during restore" });
   }
 });

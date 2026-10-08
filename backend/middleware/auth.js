@@ -1,17 +1,27 @@
 const jwt = require('jsonwebtoken');
 
-function auth(req, res, next) {
-    const authHeader = req.header('Authorization');
-    if (!authHeader) return res.status(401).json({ error: 'Access denied. No token provided.' });
-
+module.exports = (req, res, next) => {
     try {
+        const authHeader = req.header('Authorization');
+        
+        // Check if token exists
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            console.log("❌ Auth Error: No Token or invalid format");
+            return res.status(401).json({ error: 'Access Denied. No token provided.' });
+        }
+
+        // Extract token
         const token = authHeader.split(' ')[1];
-        const verified = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = verified; 
+        
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Attach decoded payload (which contains userId) to req.user
+        req.user = decoded;
+        
         next();
     } catch (error) {
-        res.status(400).json({ error: 'Invalid token.' });
+        console.error("❌ Auth Middleware Error:", error.message);
+        res.status(401).json({ error: 'Invalid or expired token.' });
     }
-}
-
-module.exports = auth;
+};
