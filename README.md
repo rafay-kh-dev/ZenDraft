@@ -52,3 +52,46 @@ Navigate to the backend directory, install dependencies, and configure your envi
 *  cd backend
 *  npm install
 
+## Create a .env file in the backend directory and add the following variables:
+
+*  PORT=5000
+*  MONGO_URI=your_mongodb_connection_string
+*  JWT_SECRET=your_super_secret_jwt_key
+*  GOOGLE_CLIENT_ID=your_google_oauth_client_id
+
+## Start the backend server:
+
+*  npm start
+
+## Frontend Setup & Execution
+
+*  cd frontend
+*  npm install
+*  npm run dev
+
+The application will now be running locally at http://localhost:5173.
+
+## Folder Structure
+
+pendraft/
+  backend/
+    middleware/      
+    models/          
+    index.js         
+    package.json
+  frontend/
+    src/
+      components/  
+      pages/       
+      App.jsx      
+      main.jsx
+    tailwind.config.js
+    package.json
+
+## Contributing
+
+Contributions, issues, and feature requests are welcome. Feel free to check the issues page if you want to contribute.
+
+## License
+
+This project is licensed under the MIT License.
