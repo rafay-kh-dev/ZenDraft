@@ -6,10 +6,21 @@ import axios from "axios";
 export default function Login() {
   const navigate = useNavigate();
   const [isLoginView, setIsLoginView] = useState(true);
+
+  // Form States
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [penName, setPenName] = useState(""); // 🔥 Nayi state Pen Name ke liye
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // UI States
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
 
   const API_BASE_URL = import.meta.env.DEV
     ? "http://localhost:5000"
@@ -18,6 +29,46 @@ export default function Login() {
   useEffect(() => {
     document.title = isLoginView ? "PenDraft" : "PenDraft";
   }, [isLoginView]);
+
+  const handlePasswordChange = (e) => {
+    const val = e.target.value;
+    setPassword(val);
+
+    if (!isLoginView) {
+      let strength = 0;
+      if (val.length >= 8) strength += 1;
+      if (/[A-Z]/.test(val)) strength += 1;
+      if (/[a-z]/.test(val)) strength += 1;
+      if (/[0-9]/.test(val)) strength += 1;
+      if (/[^A-Za-z0-9]/.test(val)) strength += 1;
+      setPasswordStrength(strength);
+    }
+  };
+
+  const getStrengthConfig = (strength) => {
+    switch (strength) {
+      case 1:
+        return { label: "Weak", color: "bg-[#C95C5C]", text: "text-[#C95C5C]" };
+      case 2:
+        return { label: "Fair", color: "bg-[#E09A55]", text: "text-[#E09A55]" };
+      case 3:
+        return { label: "Good", color: "bg-[#D4AF37]", text: "text-[#D4AF37]" };
+      case 4:
+        return {
+          label: "Strong",
+          color: "bg-[#8B9D83]",
+          text: "text-[#8B9D83]",
+        };
+      case 5:
+        return {
+          label: "Excellent",
+          color: "bg-[#5A7A5A]",
+          text: "text-[#5A7A5A]",
+        };
+      default:
+        return { label: "", color: "bg-[#E8E4DB]", text: "text-[#B3ADA4]" };
+    }
+  };
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
@@ -36,6 +87,21 @@ export default function Login() {
     e.preventDefault();
     setError("");
 
+    if (!isLoginView) {
+      if (!firstName || !lastName) {
+        setError("Please provide your full real name.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+      if (passwordStrength < 3) {
+        setError("Please choose a stronger password (at least 'Good').");
+        return;
+      }
+    }
+
     if (!email || !password) {
       setError("Please provide both email and password.");
       return;
@@ -44,25 +110,30 @@ export default function Login() {
     setIsLoading(true);
     try {
       const endpoint = isLoginView ? "/api/auth/login" : "/api/auth/signup";
-      const res = await axios.post(`${API_BASE_URL}${endpoint}`, {
-        email,
-        password,
-      });
+
+      // Send penName along with other details during signup
+      const payload = isLoginView
+        ? { email, password }
+        : {
+            email,
+            password,
+            name: `${firstName} ${lastName}`.trim(),
+            penName: penName.trim(),
+          };
+
+      const res = await axios.post(`${API_BASE_URL}${endpoint}`, payload);
 
       localStorage.setItem("zenToken", res.data.token);
       window.location.href = "/";
     } catch (err) {
       console.error("Authentication error:", err);
-      setError(
-        err.response?.data?.message || "Please check your email and password.",
-      );
+      setError(err.response?.data?.message || "Please check your credentials.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    // Fixed viewport height mapping to avoid any scroll
     <div className="h-[100dvh] w-full bg-[#FDFCF8] flex items-center justify-center p-4 sm:p-8 relative overflow-hidden font-sans selection:bg-[#F2EFE9]">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap');
@@ -72,15 +143,13 @@ export default function Login() {
         @keyframes fadeIn { 0% { opacity: 0; transform: translateY(4px); } 100% { opacity: 1; transform: translateY(0); } }
       `}</style>
 
-      {/* Subtle background decorations */}
       <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] rounded-full bg-[#F2EFE9] opacity-50 blur-3xl"></div>
         <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] rounded-full bg-[#E8E4DB] opacity-50 blur-3xl"></div>
       </div>
 
-      {/* Main Card container locked within screen bounds */}
       <div className="relative w-full max-w-[1050px] h-full max-h-[650px] flex bg-white rounded-3xl shadow-[0_20px_80px_rgba(0,0,0,0.04)] border border-[#F2EFE9] overflow-hidden z-10">
-        {/* Left Side - Inspiration (Hidden on Mobile to prevent scroll) */}
+        {/* Left Side - Inspiration */}
         <div className="hidden md:flex w-[50%] p-8 lg:p-12 bg-[#F9F8F5] flex-col justify-between border-r border-[#EAE7E0]">
           <div>
             <div className="flex items-center mb-8 lg:mb-10">
@@ -99,24 +168,6 @@ export default function Login() {
                   fill="#2D2824"
                 />
                 <path d="M13 2H16.5V14L14.75 12L13 14V2Z" fill="#D4AF37" />
-                <rect
-                  x="10"
-                  y="7"
-                  width="6"
-                  height="2"
-                  rx="1"
-                  fill="#2D2824"
-                  opacity="0.85"
-                />
-                <rect
-                  x="10"
-                  y="11"
-                  width="4"
-                  height="2"
-                  rx="1"
-                  fill="#2D2824"
-                  opacity="0.85"
-                />
               </svg>
               <span className="font-serif italic text-[22px] ml-3 text-[#2D2824]">
                 PenDraft
@@ -145,8 +196,7 @@ export default function Login() {
         </div>
 
         {/* Right Side - Authentication Form */}
-        <div className="w-full md:w-[50%] p-6 sm:p-8 flex flex-col items-center justify-center bg-white relative">
-          {/* Mobile Logo View */}
+        <div className="w-full md:w-[50%] p-6 sm:p-8 flex flex-col items-center justify-center bg-white relative overflow-y-auto custom-scrollbar">
           <div className="md:hidden flex items-center mb-6 absolute top-6">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -184,20 +234,51 @@ export default function Login() {
               </p>
             </div>
 
-            {/* Error Message Display */}
             {error && (
-              <div className="mb-4 p-2.5 bg-red-50 rounded-xl border border-red-100 text-center">
+              <div className="mb-4 p-2.5 bg-red-50 rounded-xl border border-red-100 text-center animate-fade-in">
                 <p className="text-[12px] font-sans font-medium text-[#C95C5C]">
                   {error}
                 </p>
               </div>
             )}
 
-            {/* Email/Password Form */}
             <form
               onSubmit={handleEmailAuth}
               className="flex flex-col gap-3 mb-5"
             >
+              {!isLoginView && (
+                <>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      placeholder="First name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                      className="w-1/2 bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[13px] font-sans text-[#2D2824] placeholder-[#B3ADA4] outline-none transition-colors"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Last name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                      className="w-1/2 bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[13px] font-sans text-[#2D2824] placeholder-[#B3ADA4] outline-none transition-colors"
+                    />
+                  </div>
+                  {/* Pen Name Field */}
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Author / Pen Name (Optional)"
+                      value={penName}
+                      onChange={(e) => setPenName(e.target.value)}
+                      className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[13px] font-sans text-[#2D2824] placeholder-[#B3ADA4] outline-none transition-colors"
+                    />
+                  </div>
+                </>
+              )}
+
               <div>
                 <input
                   type="email"
@@ -208,16 +289,70 @@ export default function Login() {
                   className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[13px] font-sans text-[#2D2824] placeholder-[#B3ADA4] outline-none transition-colors"
                 />
               </div>
-              <div>
+
+              {/* Password Field with Text Show/Hide */}
+              <div className="relative">
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={handlePasswordChange}
                   required
-                  className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[13px] font-sans text-[#2D2824] placeholder-[#B3ADA4] outline-none transition-colors"
+                  className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl pl-4 pr-16 py-3 text-[13px] font-sans text-[#2D2824] placeholder-[#B3ADA4] outline-none transition-colors"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-sans font-bold uppercase tracking-widest text-[#B3ADA4] hover:text-[#2D2824] transition-colors p-1"
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
               </div>
+
+              {/* Password Strength Meter (Only in Signup) */}
+              {!isLoginView && password.length > 0 && (
+                <div className="flex flex-col gap-1.5 px-1 animate-fade-in">
+                  <div className="flex gap-1 h-1">
+                    {[1, 2, 3, 4, 5].map((level) => (
+                      <div
+                        key={level}
+                        className={`flex-1 rounded-full transition-all duration-300 ${
+                          passwordStrength >= level
+                            ? getStrengthConfig(passwordStrength).color
+                            : "bg-[#EAE7E0]"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p
+                    className={`text-[10px] font-sans font-medium text-right transition-colors ${getStrengthConfig(passwordStrength).text}`}
+                  >
+                    {getStrengthConfig(passwordStrength).label}
+                  </p>
+                </div>
+              )}
+
+              {/* Confirm Password Field with Text Show/Hide (Only in Signup) */}
+              {!isLoginView && (
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm Password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl pl-4 pr-16 py-3 text-[13px] font-sans text-[#2D2824] placeholder-[#B3ADA4] outline-none transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-sans font-bold uppercase tracking-widest text-[#B3ADA4] hover:text-[#2D2824] transition-colors p-1"
+                  >
+                    {showConfirmPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isLoading}
@@ -231,7 +366,6 @@ export default function Login() {
               </button>
             </form>
 
-            {/* Divider */}
             <div className="flex items-center w-full mb-5">
               <div className="flex-1 h-px bg-[#F2EFE9]"></div>
               <span className="px-3 text-[9px] font-sans font-bold text-[#B3ADA4] uppercase tracking-widest">
@@ -240,7 +374,6 @@ export default function Login() {
               <div className="flex-1 h-px bg-[#F2EFE9]"></div>
             </div>
 
-            {/* Google Authentication */}
             <div className="w-full flex justify-center shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-all duration-300 border border-[#F2EFE9]">
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
@@ -253,15 +386,19 @@ export default function Login() {
               />
             </div>
 
-            {/* View Toggle */}
-            <div className="mt-6 md:mt-8 text-center">
+            <div className="mt-6 md:mt-8 text-center pb-6 md:pb-0">
               <button
                 type="button"
                 onClick={() => {
                   setIsLoginView(!isLoginView);
                   setError("");
+                  setFirstName("");
+                  setLastName("");
+                  setPenName(""); // Nayi field ko bhi reset karein
                   setEmail("");
                   setPassword("");
+                  setConfirmPassword("");
+                  setPasswordStrength(0);
                 }}
                 className="text-[12px] font-sans font-medium text-[#7A746D] hover:text-[#2D2824] transition-colors cursor-pointer"
               >
