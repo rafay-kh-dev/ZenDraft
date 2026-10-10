@@ -14,9 +14,9 @@ export default function StudioHeader({
   statuses,
   getStatusDotColor,
   setIsSidebarOpen,
-  userName, // 🔥 Naya prop user ka naam lene ke liye
+  userName,
+  userPicture,
 }) {
-  // Naam ko clean karna (sirf first name nikalna agar lamba naam ho)
   const displayFirstName = userName ? userName.split(" ")[0] : "Author";
 
   return (
@@ -43,7 +43,6 @@ export default function StudioHeader({
             </svg>
           </button>
 
-          {/* Search Bar with Icon and Clear Action */}
           <div className="w-[200px] sm:w-[300px] relative group flex items-center">
             <svg
               className="w-4 h-4 text-[#A39A8E] absolute left-3.5 pointer-events-none"
@@ -77,7 +76,6 @@ export default function StudioHeader({
         </div>
 
         <div className="flex items-center gap-6">
-          {/* Daily Goal Widget with Percentage */}
           <div className="flex flex-col items-end">
             <div className="flex items-center justify-between w-full mb-1">
               <span className="text-[9px] sm:text-[10px] font-sans font-bold tracking-[0.15em] uppercase text-[#A39A8E]">
@@ -105,7 +103,6 @@ export default function StudioHeader({
         </div>
       </header>
 
-      {/* Sticky Tab Titles & Actions Bar */}
       <div className="px-6 sm:px-12 pb-5 pt-1 w-full max-w-[1250px]">
         {currentView === "projects" ? (
           <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4">
@@ -150,20 +147,34 @@ export default function StudioHeader({
         ) : (
           <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-5">
             <div>
-              {/* 🔥 Professional Name Display */}
               {currentView === "desk" && (
-                <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#D4AF37] mb-1 block">
-                  Welcome Back, {displayFirstName}
-                </span>
+                <div className="flex items-center gap-3 mb-2">
+                  {/* 🔥 Agar image hai toh show karo */}
+                  {userPicture && (
+                    <img
+                      src={userPicture}
+                      alt="Author"
+                      className="w-8 h-8 rounded-full object-cover border border-[#E8E4DB] shadow-sm"
+                    />
+                  )}
+                  <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#D4AF37]">
+                    Welcome Back, {displayFirstName}
+                  </span>
+                </div>
               )}
 
+              {currentView === "settings" && (
+                <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#D4AF37] mb-1 block">
+                  Preferences
+                </span>
+              )}
               <h2 className="text-[36px] sm:text-[46px] text-[#2D2824] tracking-tight leading-none font-serif font-medium mb-3">
                 {currentView === "wastebasket"
                   ? "Discarded Pages"
-                  : "Your Desk"}
+                  : currentView === "settings"
+                    ? "Studio Settings"
+                    : "Your Desk"}
               </h2>
-
-              {/* Quick Status Filter Pills */}
               {currentView === "desk" && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   <button

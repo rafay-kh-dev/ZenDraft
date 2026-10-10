@@ -8,8 +8,9 @@ const UserSchema = new mongoose.Schema({
         unique: true 
     },
     name: String,
+    penName: String, // 🔥 Yeh field add karna bohot zaroori hai
     picture: String,
-    password: String // Email/password auth ke liye
+    password: String 
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);

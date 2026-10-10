@@ -5,14 +5,17 @@ const cors = require('cors');
 const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs'); 
-const User = require('./models/User'); // 🔥 Model imported cleanly from the modular file
+const User = require('./models/User');
 const Draft = require('./models/Draft');
 const auth = require('./middleware/auth');
 const Folder = require('./models/Folder');
 const Lore = require('./models/Lore');
 
 const app = express();
-app.use(express.json());
+
+// 🔥 Sirf yeh 2 lines honi chahiye payload ke liye:
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 const allowedOrigins = [
     'http://localhost:5173', 
@@ -138,10 +141,51 @@ app.post('/api/auth/login', async (req, res) => {
             { expiresIn: '90d' }
         );
 
-        res.json({ token: sessionToken, user: { id: user._id, email: user.email, name: user.name } });
+        res.json({ token: sessionToken, user: { id: user._id, email: user.email, name: user.name, penName: user.penName, picture: user.picture } });
     } catch (error) {
         console.error("❌ Login error:", error);
         res.status(500).json({ message: "Server error during login." });
+    }
+});
+
+// ==========================================
+// 4. UPDATE USER PROFILE (SETTINGS) 🔥 FIXED LOCATION 🔥
+// ==========================================
+app.put('/api/auth/profile', auth, async (req, res) => {
+    try {
+        const userId = getUserId(req);
+        const { name, penName, picture, currentPassword, newPassword } = req.body; 
+        
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        if (name !== undefined) user.name = name;
+        if (penName !== undefined) user.penName = penName;
+        if (picture !== undefined) user.picture = picture; 
+
+        if (currentPassword && newPassword) {
+            if (!user.password) {
+                return res.status(400).json({ error: "Google accounts cannot change password here." });
+            }
+            
+            const isMatch = await bcrypt.compare(currentPassword, user.password);
+            if (!isMatch) {
+                return res.status(400).json({ error: "Current password is incorrect." });
+            }
+            
+            const salt = await bcrypt.genSalt(10);
+            user.password = await bcrypt.hash(newPassword, salt);
+        }
+
+        await user.save();
+        
+        res.status(200).json({ 
+            message: "Profile updated successfully", 
+            user: { id: user._id, email: user.email, name: user.name, penName: user.penName, picture: user.picture } 
+        });
+    } catch (error) {
+        console.error("❌ Profile update error:", error);
+        res.status(500).json({ error: "Failed to update profile." });
     }
 });
 
@@ -363,8 +407,9 @@ app.delete('/api/lore/:id', auth, async (req, res) => {
     }
 });
 
+// 🔥 SERVER START (HAMESHA AAKHIR MEIN HONA CHAHIYE) 🔥
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server is running on port ${PORT}`);
-    console.log(`🔥 LATEST SIGNUP ROUTES LOADED SUCESSFULLY! 🔥`); // Yeh line check karne ke liye hai
+    console.log(`🔥 LATEST ROUTES WITH 10MB IMAGE SUPPORT LOADED! 🔥`);
 });

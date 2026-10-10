@@ -13,6 +13,8 @@ export default function Dashboard() {
   const [settingsData, setSettingsData] = useState({
     name: "",
     penName: "",
+    email: "",
+    picture: "",
     currentPassword: "",
     newPassword: "",
   });
@@ -306,10 +308,8 @@ export default function Dashboard() {
     const matchesSearch =
       (draft.title || "").toLowerCase().includes(searchLower) ||
       (draft.content || "").toLowerCase().includes(searchLower);
-
     const matchesStatus =
       selectedStatusFilter === "all" || draft.status === selectedStatusFilter;
-
     return matchesSearch && matchesStatus;
   });
 
@@ -406,49 +406,111 @@ export default function Dashboard() {
     "Finished",
   ];
 
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    setSettingsMessage({ text: "Updating...", type: "loading" });
+  // 🔥 REUSABLE AUTO-SAVE FUNCTION
+  const saveProfileData = async (payload, successMsg) => {
+    setSettingsMessage({ text: "Saving...", type: "loading" });
     const token = localStorage.getItem("zenToken");
 
     try {
-      const res = await axios.put(
-        `${API_BASE_URL}/api/auth/profile`,
-        settingsData,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const res = await axios.put(`${API_BASE_URL}/api/auth/profile`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       localStorage.setItem("zenUser", JSON.stringify(res.data.user));
       setAuthorName(res.data.user.penName || res.data.user.name);
-      setSettingsData({
-        ...settingsData,
-        currentPassword: "",
-        newPassword: "",
-      });
-      setSettingsMessage({
-        text: "Profile successfully updated.",
-        type: "success",
-      });
 
+      setSettingsMessage({ text: successMsg, type: "success" });
       setTimeout(() => setSettingsMessage({ text: "", type: "" }), 3000);
     } catch (error) {
       setSettingsMessage({
-        text: error.response?.data?.error || "Failed to update profile.",
+        text: error.response?.data?.error || "Failed to save changes.",
         type: "error",
       });
     }
   };
 
+  // 🔥 1. IMAGE UPLOAD HANDLER (AUTO-SAVE)
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setSettingsMessage({
+          text: "Image size must be less than 2MB.",
+          type: "error",
+        });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Image = reader.result;
+        setSettingsData({ ...settingsData, picture: base64Image });
+        // Immediately save image to database
+        await saveProfileData(
+          { picture: base64Image },
+          "Author portrait updated!",
+        );
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // 🔥 2. NAMES BLUR HANDLER (AUTO-SAVE JAB INPUT SE BAHAR CLICK KAREIN)
+  const handleNameBlur = async () => {
+    const storedUser = JSON.parse(localStorage.getItem("zenUser") || "{}");
+
+    // Sirf tab save karein jab actually naam change kiya ho
+    if (
+      settingsData.name !== storedUser.name ||
+      settingsData.penName !== storedUser.penName
+    ) {
+      await saveProfileData(
+        {
+          name: settingsData.name,
+          penName: settingsData.penName,
+        },
+        "Profile identity automatically saved.",
+      );
+    }
+  };
+
+  // 🔥 3. PASSWORD SUBMIT HANDLER (ONLY MANUAL SAVE)
+  const handlePasswordUpdate = async (e) => {
+    e.preventDefault();
+    if (!settingsData.currentPassword || !settingsData.newPassword) {
+      setSettingsMessage({
+        text: "Please provide both current and new passwords.",
+        type: "error",
+      });
+      return;
+    }
+
+    await saveProfileData(
+      {
+        currentPassword: settingsData.currentPassword,
+        newPassword: settingsData.newPassword,
+      },
+      "Password successfully updated.",
+    );
+
+    // Clear password fields upon success
+    setSettingsData((prev) => ({
+      ...prev,
+      currentPassword: "",
+      newPassword: "",
+    }));
+  };
+
   useEffect(() => {
     if (currentView === "settings") {
       const storedUser = JSON.parse(localStorage.getItem("zenUser") || "{}");
-      setSettingsData((prev) => ({
-        ...prev,
+      setSettingsData({
         name: storedUser.name || "",
         penName: storedUser.penName || "",
-      }));
+        email: storedUser.email || "",
+        picture: storedUser.picture || "",
+        currentPassword: "",
+        newPassword: "",
+      });
     }
   }, [currentView]);
 
@@ -496,11 +558,7 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={() => modal.onConfirm()}
-                className={`text-[11px] font-sans font-bold tracking-widest uppercase transition-colors cursor-pointer ${
-                  modal.type === "danger"
-                    ? "text-[#C95C5C] hover:text-red-800"
-                    : "text-[#2D2824] hover:text-black"
-                }`}
+                className={`text-[11px] font-sans font-bold tracking-widest uppercase transition-colors cursor-pointer ${modal.type === "danger" ? "text-[#C95C5C] hover:text-red-800" : "text-[#2D2824] hover:text-black"}`}
               >
                 {modal.type === "danger" ? "Proceed" : "Confirm"}
               </button>
@@ -528,111 +586,254 @@ export default function Dashboard() {
           statuses={statuses}
           getStatusDotColor={getStatusDotColor}
           setIsSidebarOpen={setIsSidebarOpen}
+          userPicture={
+            JSON.parse(localStorage.getItem("zenUser") || "{}").picture
+          }
         />
 
         <main className="px-6 sm:px-12 pt-6 pb-32 max-w-[1250px]">
-          {/* 🔥 SETTINGS VIEW */}
+          {/* PROFESSIONAL SETTINGS LAYOUT */}
           {currentView === "settings" ? (
-            <div className="animate-fade-in max-w-[600px] mt-4">
-              <h2 className="text-[32px] sm:text-[40px] text-[#2D2824] tracking-tight leading-none font-serif font-medium mb-8">
-                Studio Settings
-              </h2>
-
-              <form
-                onSubmit={handleUpdateProfile}
-                className="bg-white p-8 rounded-2xl shadow-[0_4px_25px_rgba(0,0,0,0.02)] flex flex-col gap-6"
-              >
-                {settingsMessage.text && (
-                  <div
-                    className={`p-3 rounded-xl text-[12px] font-sans font-medium text-center ${
-                      settingsMessage.type === "success"
-                        ? "bg-[#F0F5F0] text-[#5A7A5A] border border-[#DCE8DC]"
-                        : settingsMessage.type === "error"
-                          ? "bg-[#FDF2F2] text-[#C95C5C] border border-[#FADEDE]"
-                          : "bg-[#F7F5F0] text-[#7A746D]"
-                    }`}
-                  >
-                    {settingsMessage.text}
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-2 block">
-                    Real Name
-                  </label>
-                  <input
-                    type="text"
-                    value={settingsData.name}
-                    onChange={(e) =>
-                      setSettingsData({ ...settingsData, name: e.target.value })
-                    }
-                    className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-2 block">
-                    Author / Pen Name
-                  </label>
-                  <input
-                    type="text"
-                    value={settingsData.penName}
-                    onChange={(e) =>
-                      setSettingsData({
-                        ...settingsData,
-                        penName: e.target.value,
-                      })
-                    }
-                    className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
-                  />
-                </div>
-
-                <div className="h-px bg-[#F2EFE9] my-2 w-full"></div>
-
-                <div>
-                  <label className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-2 block">
-                    Update Password
-                  </label>
-                  <p className="text-[#B3ADA4] text-[12px] font-sans mb-3 font-light">
-                    Leave blank if you do not wish to change your password.
-                  </p>
-
-                  <div className="flex flex-col gap-3">
-                    <input
-                      type="password"
-                      placeholder="Current Password"
-                      value={settingsData.currentPassword}
-                      onChange={(e) =>
-                        setSettingsData({
-                          ...settingsData,
-                          currentPassword: e.target.value,
-                        })
-                      }
-                      className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
-                    />
-                    <input
-                      type="password"
-                      placeholder="New Password"
-                      value={settingsData.newPassword}
-                      onChange={(e) =>
-                        setSettingsData({
-                          ...settingsData,
-                          newPassword: e.target.value,
-                        })
-                      }
-                      className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={settingsMessage.type === "loading"}
-                  className="mt-4 text-[11px] font-sans font-bold tracking-widest uppercase text-[#FDFCF8] bg-[#2D2824] px-6 py-3.5 rounded-xl hover:bg-black transition-all cursor-pointer shadow-sm w-full sm:w-auto self-end disabled:opacity-50"
+            <div className="animate-fade-in w-full pb-10 mt-4">
+              {settingsMessage.text && (
+                <div
+                  className={`mb-8 p-4 rounded-xl text-[13px] font-sans font-medium flex items-center justify-between shadow-sm ${
+                    settingsMessage.type === "success"
+                      ? "bg-[#F0F5F0] text-[#5A7A5A] border border-[#DCE8DC]"
+                      : settingsMessage.type === "error"
+                        ? "bg-[#FDF2F2] text-[#C95C5C] border border-[#FADEDE]"
+                        : "bg-[#F7F5F0] text-[#7A746D] border border-[#E8E4DB]"
+                  }`}
                 >
-                  Save Changes
-                </button>
-              </form>
+                  <span>{settingsMessage.text}</span>
+                  <button
+                    onClick={() => setSettingsMessage({ text: "", type: "" })}
+                    className="opacity-70 hover:opacity-100 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-12">
+                {/* 🟢 Profile Identity Section (Auto-Saving) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-12 pb-12 border-b border-[#E8E4DB]">
+                  <div className="col-span-1">
+                    <h3 className="text-[18px] font-serif font-medium text-[#2D2824] mb-2">
+                      Profile Identity
+                    </h3>
+                    <p className="text-[13px] font-sans font-light text-[#7A746D] leading-relaxed mb-4">
+                      Update your primary account name and your publishing
+                      alias.
+                    </p>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-sans font-bold tracking-widest uppercase text-[#8B9D83] bg-[#F0F5F0] px-3 py-1.5 rounded-full border border-[#DCE8DC]">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="w-3 h-3"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Auto-Saving
+                    </span>
+                  </div>
+
+                  <div className="col-span-1 md:col-span-2 bg-white p-7 md:p-8 rounded-2xl shadow-[0_4px_25px_rgba(0,0,0,0.02)] flex flex-col gap-6">
+                    <div className="flex items-center gap-6 mb-4">
+                      <div className="w-20 h-20 rounded-full bg-[#F2EFE9] border border-[#E8E4DB] relative group overflow-hidden flex-shrink-0 shadow-sm">
+                        {settingsData.picture ? (
+                          <img
+                            src={settingsData.picture}
+                            alt="Author"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[#A39A8E]">
+                            <svg
+                              className="w-8 h-8"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
+                              />
+                            </svg>
+                          </div>
+                        )}
+                        <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity duration-300">
+                          <span className="text-[9px] text-white font-bold tracking-widest uppercase mt-1">
+                            Upload
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                      <div>
+                        <h4 className="text-[12px] font-sans font-bold text-[#2D2824] uppercase tracking-widest mb-1">
+                          Author Portrait
+                        </h4>
+                        <p className="text-[12px] font-sans font-light text-[#7A746D]">
+                          Recommended size: 256x256px. Max 2MB.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-2 block">
+                        Account Email
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="email"
+                          value={settingsData.email}
+                          disabled
+                          className="w-full bg-[#F7F5F0] border border-[#E8E4DB] rounded-xl px-4 py-3.5 text-[14px] font-sans text-[#7A746D] outline-none transition-colors cursor-not-allowed"
+                        />
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth="2"
+                          stroke="currentColor"
+                          className="w-[16px] h-[16px] text-[#B3ADA4] absolute right-4 top-1/2 -translate-y-1/2"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+                          />
+                        </svg>
+                      </div>
+                      <p className="text-[11px] text-[#A39A8E] mt-1.5 font-sans">
+                        Email address cannot be changed.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-6">
+                      <div className="flex-1">
+                        <label className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-2 block">
+                          Real Name
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsData.name}
+                          onChange={(e) =>
+                            setSettingsData({
+                              ...settingsData,
+                              name: e.target.value,
+                            })
+                          }
+                          onBlur={handleNameBlur} // 🔥 Auto-save on blur
+                          className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3.5 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-2 block">
+                          Author / Pen Name
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsData.penName}
+                          onChange={(e) =>
+                            setSettingsData({
+                              ...settingsData,
+                              penName: e.target.value,
+                            })
+                          }
+                          onBlur={handleNameBlur} // 🔥 Auto-save on blur
+                          className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3.5 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 🔴 Account Security Section (Manual Form Submission) */}
+                <form
+                  onSubmit={handlePasswordUpdate}
+                  autoComplete="off"
+                  className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-12 pb-12"
+                >
+                  <div className="col-span-1">
+                    <h3 className="text-[18px] font-serif font-medium text-[#2D2824] mb-2">
+                      Account Security
+                    </h3>
+                    <p className="text-[13px] font-sans font-light text-[#7A746D] leading-relaxed">
+                      Update your password to keep your studio secure.
+                    </p>
+                  </div>
+
+                  <div className="col-span-1 md:col-span-2 flex flex-col gap-6">
+                    <div className="bg-white p-7 md:p-8 rounded-2xl shadow-[0_4px_25px_rgba(0,0,0,0.02)] flex flex-col gap-6">
+                      <div>
+                        <label className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-2 block">
+                          Current Password
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="••••••••"
+                          value={settingsData.currentPassword}
+                          onChange={(e) =>
+                            setSettingsData({
+                              ...settingsData,
+                              currentPassword: e.target.value,
+                            })
+                          }
+                          autoComplete="new-password"
+                          className="w-full md:w-[60%] bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3.5 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-2 block">
+                          New Password
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="Provide a new password"
+                          value={settingsData.newPassword}
+                          onChange={(e) =>
+                            setSettingsData({
+                              ...settingsData,
+                              newPassword: e.target.value,
+                            })
+                          }
+                          autoComplete="new-password"
+                          className="w-full md:w-[60%] bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3.5 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <button
+                        type="submit"
+                        disabled={
+                          settingsMessage.type === "loading" ||
+                          (!settingsData.currentPassword &&
+                            !settingsData.newPassword)
+                        }
+                        className="text-[12px] font-sans font-bold tracking-widest uppercase text-[#FDFCF8] bg-[#2D2824] px-8 py-4 rounded-xl hover:bg-black transition-all cursor-pointer shadow-md disabled:opacity-50"
+                      >
+                        {settingsMessage.type === "loading"
+                          ? "Saving..."
+                          : "Update Password"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
             </div>
           ) : currentView === "projects" ? (
             <div className="animate-fade-in">
