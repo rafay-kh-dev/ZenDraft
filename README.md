@@ -41,6 +41,14 @@ Follow these instructions to set up the project locally on your machine.
 
 Clone the repository:
 
-```bash
+
 git clone [https://github.com/your-username/pendraft.git](https://github.com/your-username/pendraft.git)
 cd pendraft
+
+## Backend Setup & Configuration
+
+Navigate to the backend directory, install dependencies, and configure your environment:
+
+*  cd backend
+*  npm install
+
