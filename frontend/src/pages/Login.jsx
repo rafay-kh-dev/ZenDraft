@@ -16,9 +16,7 @@ export default function Login() {
     : "https://zendraft-bau8.onrender.com";
 
   useEffect(() => {
-    document.title = isLoginView
-      ? "Sign In | PenDraft"
-      : "Create Sanctuary | PenDraft";
+    document.title = isLoginView ? "PenDraft" : "PenDraft";
   }, [isLoginView]);
 
   const handleGoogleSuccess = async (credentialResponse) => {
