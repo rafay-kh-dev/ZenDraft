@@ -2,6 +2,8 @@
 
 PenDraft is a premium, distraction-free SaaS workspace designed specifically for novelists, authors, and creative writers. Built with the MERN stack, it combines a sleek, modern user interface with robust world-building tools to help writers organise their universes and focus on their craft.
 
+![PenDraft Studio Dashboard](frontend/public/screenshot.png)
+
 ## Key Features
 
 *   **Distraction-Free Editor:** A clean, immersive writing canvas with real-time auto-saving, word count tracking, and dynamic URL slugs.
