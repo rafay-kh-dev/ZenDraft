@@ -14,7 +14,11 @@ export default function StudioHeader({
   statuses,
   getStatusDotColor,
   setIsSidebarOpen,
+  userName, // 🔥 Naya prop user ka naam lene ke liye
 }) {
+  // Naam ko clean karna (sirf first name nikalna agar lamba naam ho)
+  const displayFirstName = userName ? userName.split(" ")[0] : "Author";
+
   return (
     <div className="sticky top-0 z-30 bg-[#FDFCF8]/95 backdrop-blur-md w-full border-b border-[#F2EFE9]/60">
       <header className="h-[80px] sm:h-[90px] flex items-center justify-between px-6 sm:px-12 w-full">
@@ -146,8 +150,17 @@ export default function StudioHeader({
         ) : (
           <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-5">
             <div>
+              {/* 🔥 Professional Name Display */}
+              {currentView === "desk" && (
+                <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#D4AF37] mb-1 block">
+                  Welcome Back, {displayFirstName}
+                </span>
+              )}
+
               <h2 className="text-[36px] sm:text-[46px] text-[#2D2824] tracking-tight leading-none font-serif font-medium mb-3">
-                {currentView === "wastebasket" ? "Discarded Pages" : "My Desk"}
+                {currentView === "wastebasket"
+                  ? "Discarded Pages"
+                  : "Your Desk"}
               </h2>
 
               {/* Quick Status Filter Pills */}

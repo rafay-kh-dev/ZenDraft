@@ -10,6 +10,16 @@ const API_BASE_URL = import.meta.env.DEV
   : "https://zendraft-bau8.onrender.com";
 
 export default function Dashboard() {
+  const [settingsData, setSettingsData] = useState({
+    name: "",
+    penName: "",
+    currentPassword: "",
+    newPassword: "",
+  });
+  const [settingsMessage, setSettingsMessage] = useState({
+    text: "",
+    type: "",
+  });
   const [allDrafts, setAllDrafts] = useState([]);
   const [folders, setFolders] = useState([]);
   const [loreEntries, setLoreEntries] = useState([]);
@@ -18,6 +28,8 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("all");
+
+  const [authorName, setAuthorName] = useState("Author");
 
   const [newFolderName, setNewFolderName] = useState("");
   const [newLoreTitle, setNewLoreTitle] = useState("");
@@ -40,6 +52,17 @@ export default function Dashboard() {
 
   useEffect(() => {
     document.title = "PenDraft";
+
+    const storedUser = localStorage.getItem("zenUser");
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setAuthorName(parsedUser.penName || parsedUser.name || "Author");
+      } catch (e) {
+        console.error("Error parsing user data");
+      }
+    }
+
     fetchAllData();
   }, []);
 
@@ -72,6 +95,7 @@ export default function Dashboard() {
     } catch (error) {
       if (error.response?.status === 401) {
         localStorage.removeItem("zenToken");
+        localStorage.removeItem("zenUser");
         navigate("/");
       }
     } finally {
@@ -188,6 +212,7 @@ export default function Dashboard() {
       message: "Are you ready to step away from your writing desk?",
       onConfirm: () => {
         localStorage.removeItem("zenToken");
+        localStorage.removeItem("zenUser");
         navigate("/");
       },
     });
@@ -304,7 +329,6 @@ export default function Dashboard() {
     e.dataTransfer.dropEffect = "move";
   };
 
-  // 🔥 REAL-TIME LIVE REORDERING WHILE DRAGGING 🔥
   const handleDragEnter = (e, targetId, listType) => {
     e.preventDefault();
     if (!draggedId || draggedId === targetId) return;
@@ -382,6 +406,52 @@ export default function Dashboard() {
     "Finished",
   ];
 
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setSettingsMessage({ text: "Updating...", type: "loading" });
+    const token = localStorage.getItem("zenToken");
+
+    try {
+      const res = await axios.put(
+        `${API_BASE_URL}/api/auth/profile`,
+        settingsData,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      localStorage.setItem("zenUser", JSON.stringify(res.data.user));
+      setAuthorName(res.data.user.penName || res.data.user.name);
+      setSettingsData({
+        ...settingsData,
+        currentPassword: "",
+        newPassword: "",
+      });
+      setSettingsMessage({
+        text: "Profile successfully updated.",
+        type: "success",
+      });
+
+      setTimeout(() => setSettingsMessage({ text: "", type: "" }), 3000);
+    } catch (error) {
+      setSettingsMessage({
+        text: error.response?.data?.error || "Failed to update profile.",
+        type: "error",
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (currentView === "settings") {
+      const storedUser = JSON.parse(localStorage.getItem("zenUser") || "{}");
+      setSettingsData((prev) => ({
+        ...prev,
+        name: storedUser.name || "",
+        penName: storedUser.penName || "",
+      }));
+    }
+  }, [currentView]);
+
   return (
     <div className="min-h-screen bg-[#FDFCF8] text-[#2D2824] selection:bg-[#F2EFE9] flex">
       <style>{`
@@ -426,7 +496,11 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={() => modal.onConfirm()}
-                className={`text-[11px] font-sans font-bold tracking-widest uppercase transition-colors cursor-pointer ${modal.type === "danger" ? "text-[#C95C5C] hover:text-red-800" : "text-[#2D2824] hover:text-black"}`}
+                className={`text-[11px] font-sans font-bold tracking-widest uppercase transition-colors cursor-pointer ${
+                  modal.type === "danger"
+                    ? "text-[#C95C5C] hover:text-red-800"
+                    : "text-[#2D2824] hover:text-black"
+                }`}
               >
                 {modal.type === "danger" ? "Proceed" : "Confirm"}
               </button>
@@ -439,6 +513,7 @@ export default function Dashboard() {
       <div className="w-full md:pl-[260px] min-h-screen flex flex-col">
         <StudioHeader
           currentView={currentView}
+          userName={authorName}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           wordsToday={wordsToday}
@@ -456,7 +531,110 @@ export default function Dashboard() {
         />
 
         <main className="px-6 sm:px-12 pt-6 pb-32 max-w-[1250px]">
-          {currentView === "projects" ? (
+          {/* 🔥 SETTINGS VIEW */}
+          {currentView === "settings" ? (
+            <div className="animate-fade-in max-w-[600px] mt-4">
+              <h2 className="text-[32px] sm:text-[40px] text-[#2D2824] tracking-tight leading-none font-serif font-medium mb-8">
+                Studio Settings
+              </h2>
+
+              <form
+                onSubmit={handleUpdateProfile}
+                className="bg-white p-8 rounded-2xl shadow-[0_4px_25px_rgba(0,0,0,0.02)] flex flex-col gap-6"
+              >
+                {settingsMessage.text && (
+                  <div
+                    className={`p-3 rounded-xl text-[12px] font-sans font-medium text-center ${
+                      settingsMessage.type === "success"
+                        ? "bg-[#F0F5F0] text-[#5A7A5A] border border-[#DCE8DC]"
+                        : settingsMessage.type === "error"
+                          ? "bg-[#FDF2F2] text-[#C95C5C] border border-[#FADEDE]"
+                          : "bg-[#F7F5F0] text-[#7A746D]"
+                    }`}
+                  >
+                    {settingsMessage.text}
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-2 block">
+                    Real Name
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsData.name}
+                    onChange={(e) =>
+                      setSettingsData({ ...settingsData, name: e.target.value })
+                    }
+                    className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-2 block">
+                    Author / Pen Name
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsData.penName}
+                    onChange={(e) =>
+                      setSettingsData({
+                        ...settingsData,
+                        penName: e.target.value,
+                      })
+                    }
+                    className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
+                  />
+                </div>
+
+                <div className="h-px bg-[#F2EFE9] my-2 w-full"></div>
+
+                <div>
+                  <label className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#A39A8E] mb-2 block">
+                    Update Password
+                  </label>
+                  <p className="text-[#B3ADA4] text-[12px] font-sans mb-3 font-light">
+                    Leave blank if you do not wish to change your password.
+                  </p>
+
+                  <div className="flex flex-col gap-3">
+                    <input
+                      type="password"
+                      placeholder="Current Password"
+                      value={settingsData.currentPassword}
+                      onChange={(e) =>
+                        setSettingsData({
+                          ...settingsData,
+                          currentPassword: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
+                    />
+                    <input
+                      type="password"
+                      placeholder="New Password"
+                      value={settingsData.newPassword}
+                      onChange={(e) =>
+                        setSettingsData({
+                          ...settingsData,
+                          newPassword: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={settingsMessage.type === "loading"}
+                  className="mt-4 text-[11px] font-sans font-bold tracking-widest uppercase text-[#FDFCF8] bg-[#2D2824] px-6 py-3.5 rounded-xl hover:bg-black transition-all cursor-pointer shadow-sm w-full sm:w-auto self-end disabled:opacity-50"
+                >
+                  Save Changes
+                </button>
+              </form>
+            </div>
+          ) : currentView === "projects" ? (
             <div className="animate-fade-in">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-7">
                 {folders.map((folder) => (

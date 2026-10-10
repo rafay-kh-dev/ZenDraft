@@ -76,6 +76,7 @@ export default function Login() {
         token: credentialResponse.credential,
       });
       localStorage.setItem("zenToken", res.data.token);
+      localStorage.setItem("zenUser", JSON.stringify(res.data.user)); // 🔥 Added user storage
       window.location.href = "/";
     } catch (error) {
       console.error("Google authentication failed", error);
@@ -111,7 +112,6 @@ export default function Login() {
     try {
       const endpoint = isLoginView ? "/api/auth/login" : "/api/auth/signup";
 
-      // Send penName along with other details during signup
       const payload = isLoginView
         ? { email, password }
         : {
@@ -124,6 +124,7 @@ export default function Login() {
       const res = await axios.post(`${API_BASE_URL}${endpoint}`, payload);
 
       localStorage.setItem("zenToken", res.data.token);
+      localStorage.setItem("zenUser", JSON.stringify(res.data.user)); // 🔥 Added user storage
       window.location.href = "/";
     } catch (err) {
       console.error("Authentication error:", err);
