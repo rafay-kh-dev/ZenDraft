@@ -9,6 +9,109 @@ const API_BASE_URL = import.meta.env.DEV
   ? "http://localhost:5000"
   : "https://zendraft-bau8.onrender.com";
 
+const curatedBooks = [
+  {
+    id: 1,
+    title: "The Art of War",
+    author: "Sun Tzu",
+    isbn: "9781590302255",
+    cover: "https://covers.openlibrary.org/b/id/12613180-L.jpg",
+    category: "Strategy",
+    description:
+      "An ancient Chinese military treatise. The definitive work on military strategy and tactics that has inspired leaders for centuries.",
+  },
+  {
+    id: 2,
+    title: "Meditations",
+    author: "Marcus Aurelius",
+    isbn: "9780812968255",
+    cover: "https://covers.openlibrary.org/b/id/14467001-L.jpg",
+    category: "Philosophy",
+    description:
+      "A series of personal writings by Roman Emperor Marcus Aurelius, recording his private notes to himself and ideas on Stoic philosophy.",
+  },
+  {
+    id: 3,
+    title: "Frankenstein",
+    author: "Mary Shelley",
+    isbn: "9780141439471",
+    cover: "https://covers.openlibrary.org/b/id/12638814-L.jpg",
+    category: "Fiction",
+    description:
+      "Tells the story of Victor Frankenstein, a young scientist who creates a sapient creature in an unorthodox scientific experiment.",
+  },
+  {
+    id: 4,
+    title: "The Prince",
+    author: "Niccolò Machiavelli",
+    isbn: "9780226500447",
+    cover: "https://covers.openlibrary.org/b/id/10534208-L.jpg",
+    category: "Strategy",
+    description:
+      "A 16th-century political treatise written by the Italian diplomat as an instruction guide for new princes, royals, and leaders.",
+  },
+  {
+    id: 5,
+    title: "Pride and Prejudice",
+    author: "Jane Austen",
+    isbn: "9780141439518",
+    cover: "https://covers.openlibrary.org/b/id/8334812-L.jpg",
+    category: "Fiction",
+    description:
+      "An 1813 romantic novel of manners that follows the character development of Elizabeth Bennet, navigating society, morality, and marriage.",
+  },
+  {
+    id: 6,
+    title: "The Republic",
+    author: "Plato",
+    isbn: "9780140455113",
+    cover: "https://covers.openlibrary.org/b/id/8314152-L.jpg",
+    category: "Philosophy",
+    description:
+      "A Socratic dialogue written around 375 BC, concerning justice, the order and character of the just city-state, and the just man.",
+  },
+  {
+    id: 7,
+    title: "Crime and Punishment",
+    author: "Fyodor Dostoevsky",
+    isbn: "9780140449136",
+    cover: "https://covers.openlibrary.org/b/id/8113426-L.jpg",
+    category: "Psychology",
+    description:
+      "Focuses on the mental anguish and moral dilemmas of Rodion Raskolnikov, an impoverished student in Saint Petersburg.",
+  },
+  {
+    id: 8,
+    title: "Moby-Dick",
+    author: "Herman Melville",
+    isbn: "9780142437247",
+    cover: "https://covers.openlibrary.org/b/id/7222346-L.jpg",
+    category: "Fiction",
+    description:
+      "The sailor Ishmael's narrative of the obsessive quest of Ahab, captain of the whaling ship Pequod, for revenge on the giant white whale.",
+  },
+  {
+    id: 9,
+    title: "Walden",
+    author: "Henry David Thoreau",
+    isbn: "9780140390445",
+    cover: "https://covers.openlibrary.org/b/id/8233777-L.jpg",
+    category: "Philosophy",
+    description:
+      "A reflection upon simple living in natural surroundings. The work is a personal declaration of independence and voyage of spiritual discovery.",
+  },
+  {
+    id: 10,
+    title: "A Tale of Two Cities",
+    author: "Charles Dickens",
+    isbn: "9780141439600",
+    cover: "https://covers.openlibrary.org/b/id/8226993-L.jpg",
+    category: "History",
+    description:
+      "Set in London and Paris before and during the French Revolution, depicting the clash of social classes and personal sacrifice.",
+  },
+];
+
 export default function Dashboard() {
   const [settingsData, setSettingsData] = useState({
     name: "",
@@ -18,6 +121,7 @@ export default function Dashboard() {
     currentPassword: "",
     newPassword: "",
   });
+
   const [settingsMessage, setSettingsMessage] = useState({
     text: "",
     type: "",
@@ -30,16 +134,14 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("all");
+  const [activeLibraryTab, setActiveLibraryTab] = useState("All");
+  const [selectedBook, setSelectedBook] = useState(null); // 🔥 Yeh nayi state add karni hai
 
   const [authorName, setAuthorName] = useState("Author");
 
   const [newFolderName, setNewFolderName] = useState("");
   const [newFolderDescription, setNewFolderDescription] = useState("");
   const [newFolderColor, setNewFolderColor] = useState("#D4AF37");
-  const [newLoreTitle, setNewLoreTitle] = useState("");
-  const [newLoreCategory, setNewLoreCategory] = useState("Character");
-  const [newLoreContent, setNewLoreContent] = useState("");
-  const [activeLoreTab, setActiveLoreTab] = useState("All");
   const folderColors = [
     "#D4AF37",
     "#8B9D83",
@@ -48,6 +150,11 @@ export default function Dashboard() {
     "#8D7B9A",
     "#2D2824",
   ];
+
+  const [newLoreTitle, setNewLoreTitle] = useState("");
+  const [newLoreCategory, setNewLoreCategory] = useState("Character");
+  const [newLoreContent, setNewLoreContent] = useState("");
+  const [activeLoreTab, setActiveLoreTab] = useState("All");
 
   const [draggedId, setDraggedId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
@@ -96,9 +203,8 @@ export default function Dashboard() {
       ]);
 
       const sortedDrafts = draftsRes.data.sort((a, b) => {
-        if (a.order !== undefined && b.order !== undefined) {
+        if (a.order !== undefined && b.order !== undefined)
           return a.order - b.order;
-        }
         return new Date(b.updatedAt) - new Date(a.updatedAt);
       });
 
@@ -372,9 +478,7 @@ export default function Dashboard() {
     setAllDrafts(newAllDrafts);
   };
 
-  const handleDragLeave = () => {
-    setDragOverId(null);
-  };
+  const handleDragLeave = () => setDragOverId(null);
 
   const handleDrop = async (e, targetId, listType) => {
     e.preventDefault();
@@ -423,19 +527,15 @@ export default function Dashboard() {
     "Finished",
   ];
 
-  // 🔥 REUSABLE AUTO-SAVE FUNCTION
   const saveProfileData = async (payload, successMsg) => {
     setSettingsMessage({ text: "Saving...", type: "loading" });
     const token = localStorage.getItem("zenToken");
-
     try {
       const res = await axios.put(`${API_BASE_URL}/api/auth/profile`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       localStorage.setItem("zenUser", JSON.stringify(res.data.user));
       setAuthorName(res.data.user.penName || res.data.user.name);
-
       setSettingsMessage({ text: successMsg, type: "success" });
       setTimeout(() => setSettingsMessage({ text: "", type: "" }), 3000);
     } catch (error) {
@@ -446,7 +546,6 @@ export default function Dashboard() {
     }
   };
 
-  // 🔥 1. IMAGE UPLOAD HANDLER (AUTO-SAVE)
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -461,7 +560,6 @@ export default function Dashboard() {
       reader.onloadend = async () => {
         const base64Image = reader.result;
         setSettingsData({ ...settingsData, picture: base64Image });
-        // Immediately save image to database
         await saveProfileData(
           { picture: base64Image },
           "Author portrait updated!",
@@ -471,26 +569,19 @@ export default function Dashboard() {
     }
   };
 
-  // 🔥 2. NAMES BLUR HANDLER (AUTO-SAVE JAB INPUT SE BAHAR CLICK KAREIN)
   const handleNameBlur = async () => {
     const storedUser = JSON.parse(localStorage.getItem("zenUser") || "{}");
-
-    // Sirf tab save karein jab actually naam change kiya ho
     if (
       settingsData.name !== storedUser.name ||
       settingsData.penName !== storedUser.penName
     ) {
       await saveProfileData(
-        {
-          name: settingsData.name,
-          penName: settingsData.penName,
-        },
+        { name: settingsData.name, penName: settingsData.penName },
         "Profile identity automatically saved.",
       );
     }
   };
 
-  // 🔥 3. PASSWORD SUBMIT HANDLER (ONLY MANUAL SAVE)
   const handlePasswordUpdate = async (e) => {
     e.preventDefault();
     if (!settingsData.currentPassword || !settingsData.newPassword) {
@@ -500,7 +591,6 @@ export default function Dashboard() {
       });
       return;
     }
-
     await saveProfileData(
       {
         currentPassword: settingsData.currentPassword,
@@ -508,8 +598,6 @@ export default function Dashboard() {
       },
       "Password successfully updated.",
     );
-
-    // Clear password fields upon success
     setSettingsData((prev) => ({
       ...prev,
       currentPassword: "",
@@ -540,9 +628,10 @@ export default function Dashboard() {
         ::-webkit-scrollbar { display: none; }
         .animate-fade-in { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes fadeIn { 0% { opacity: 0; transform: translateY(8px); } 100% { opacity: 1; transform: translateY(0); } }
+        .book-card-hover { transform: translateY(0); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .book-card-hover:hover { transform: translateY(-8px); box-shadow: 0 20px 40px rgba(0,0,0,0.08); }
       `}</style>
 
-      {/* Author Sidebar */}
       <AuthorSidebar
         currentView={currentView}
         setCurrentView={setCurrentView}
@@ -584,7 +673,110 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Main Content Area */}
+      {selectedBook && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-[#FDFCF8]/90 backdrop-blur-sm p-4 sm:p-8 animate-fade-in"
+          onClick={() => setSelectedBook(null)}
+        >
+          <div
+            className="bg-white w-full max-w-[650px] rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.08)] border border-[#E8E4DB] flex flex-col overflow-hidden animate-fade-in p-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header & Book Info */}
+            <div className="flex justify-between items-start mb-8">
+              <div className="flex items-center gap-7">
+                <div className="w-[130px] h-[190px] shrink-0 rounded-xl overflow-hidden shadow-lg bg-[#F2EFE9] border border-[#E8E4DB]">
+                  <img
+                    src={selectedBook.cover}
+                    alt={selectedBook.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex flex-col justify-center">
+                  <span className="text-[10px] font-sans font-bold tracking-widest uppercase text-[#D4AF37] bg-amber-50 px-3 py-1.5 rounded-full w-max mb-3 border border-amber-100">
+                    {selectedBook.category}
+                  </span>
+                  <h2 className="font-serif text-[32px] text-[#2D2824] leading-tight mb-2">
+                    {selectedBook.title}
+                  </h2>
+                  <span className="text-[16px] font-sans text-[#A39A8E] italic mb-4">
+                    by {selectedBook.author}
+                  </span>
+                  <span className="text-[11px] font-sans text-[#B3ADA4] tracking-wider uppercase">
+                    ISBN: {selectedBook.isbn}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedBook(null)}
+                className="text-[#A39A8E] hover:text-[#C95C5C] hover:bg-red-50 transition-colors w-10 h-10 flex items-center justify-center rounded-full text-xl cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Synopsis */}
+            <div className="bg-[#F7F5F0] p-6 rounded-2xl mb-8 border border-[#E8E4DB]">
+              <p className="text-[14px] font-sans font-light text-[#4A443D] leading-relaxed">
+                {selectedBook.description}
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={() =>
+                  window.open(
+                    `https://openlibrary.org/search?isbn=${selectedBook.isbn}`,
+                    "_blank",
+                  )
+                }
+                className="flex-1 flex justify-center items-center gap-2 text-[12px] font-sans font-bold tracking-widest uppercase text-white bg-[#2D2824] py-4 rounded-xl hover:bg-black transition-all cursor-pointer shadow-md"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                  />
+                </svg>
+                Read Free on Open Library
+              </button>
+              <button
+                onClick={() =>
+                  window.open(
+                    `https://books.google.com/books?isbn=${selectedBook.isbn}`,
+                    "_blank",
+                  )
+                }
+                className="flex-1 flex justify-center items-center gap-2 text-[12px] font-sans font-bold tracking-widest uppercase text-[#2D2824] bg-white border border-[#E8E4DB] py-4 rounded-xl hover:bg-[#F7F5F0] transition-all cursor-pointer shadow-sm"
+              >
+                View on Google Books
+                <svg
+                  className="w-4 h-4 text-[#A39A8E]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full md:pl-[260px] min-h-screen flex flex-col">
         <StudioHeader
           currentView={currentView}
@@ -609,8 +801,85 @@ export default function Dashboard() {
         />
 
         <main className="px-6 sm:px-12 pt-6 pb-32 max-w-[1250px]">
-          {/* PROFESSIONAL SETTINGS LAYOUT */}
-          {currentView === "settings" ? (
+          {/* 🔥 1. THE LIBRARY PREMIUM UI 🔥 */}
+          {currentView === "library" ? (
+            <div className="animate-fade-in w-full pb-10 mt-4">
+              <div className="mb-8">
+                {/* 🔴 Yahan se <h2>Inspiration Library</h2> hata diya gaya hai */}
+                <p className="text-[#7A746D] font-sans font-light text-[15px] max-w-2xl leading-relaxed">
+                  Browse classic masterpieces and modern strategy guides. Draw
+                  inspiration from the greats before you sit down at your own
+                  writing desk.
+                </p>
+              </div>
+
+              {/* Library Navigation Tabs */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-6 mb-4 border-b border-[#E8E4DB]">
+                {[
+                  "All",
+                  "Strategy",
+                  "Psychology",
+                  "Craft",
+                  "Philosophy",
+                  "Fiction",
+                  "History",
+                ].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveLibraryTab(tab)}
+                    className={`px-5 py-2.5 rounded-full text-[11px] font-sans font-bold tracking-widest uppercase whitespace-nowrap transition-all cursor-pointer ${activeLibraryTab === tab ? "bg-[#2D2824] text-white shadow-md" : "bg-transparent text-[#7A746D] hover:bg-[#F2EFE9] hover:text-[#2D2824]"}`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                {curatedBooks
+                  .filter(
+                    (book) =>
+                      activeLibraryTab === "All" ||
+                      book.category === activeLibraryTab,
+                  )
+                  .map((book) => (
+                    <div
+                      key={book.id}
+                      className="bg-white rounded-2xl p-6 shadow-[0_4px_25px_rgba(0,0,0,0.02)] border border-[#F2EFE9] book-card-hover flex flex-col"
+                    >
+                      <div className="flex gap-5 mb-5">
+                        <div className="w-[100px] h-[150px] shrink-0 rounded-lg overflow-hidden shadow-md bg-[#F2EFE9]">
+                          <img
+                            src={book.cover}
+                            alt={book.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex flex-col justify-center">
+                          <span className="text-[9px] font-sans font-bold text-[#D4AF37] uppercase tracking-[0.2em] mb-1.5">
+                            {book.category}
+                          </span>
+                          <h3 className="text-[18px] font-serif font-medium text-[#2D2824] leading-snug mb-1">
+                            {book.title}
+                          </h3>
+                          <span className="text-[12px] font-sans text-[#A39A8E] italic">
+                            by {book.author}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[13px] font-sans font-light text-[#7A746D] leading-relaxed mb-6 flex-1 line-clamp-3">
+                        {book.description}
+                      </p>
+                      <button
+                        onClick={() => setSelectedBook(book)}
+                        className="w-full text-center text-[11px] font-sans font-bold tracking-widest uppercase text-[#2D2824] bg-[#F7F5F0] py-3 rounded-xl hover:bg-[#2D2824] hover:text-white transition-all cursor-pointer"
+                      >
+                        Read Preview
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : currentView === "settings" ? (
             <div className="animate-fade-in w-full pb-10 mt-4">
               {settingsMessage.text && (
                 <div
@@ -633,7 +902,6 @@ export default function Dashboard() {
               )}
 
               <div className="flex flex-col gap-12">
-                {/* 🟢 Profile Identity Section (Auto-Saving) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-12 pb-12 border-b border-[#E8E4DB]">
                   <div className="col-span-1">
                     <h3 className="text-[18px] font-serif font-medium text-[#2D2824] mb-2">
@@ -753,7 +1021,7 @@ export default function Dashboard() {
                               name: e.target.value,
                             })
                           }
-                          onBlur={handleNameBlur} // 🔥 Auto-save on blur
+                          onBlur={handleNameBlur}
                           className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3.5 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
                         />
                       </div>
@@ -770,7 +1038,7 @@ export default function Dashboard() {
                               penName: e.target.value,
                             })
                           }
-                          onBlur={handleNameBlur} // 🔥 Auto-save on blur
+                          onBlur={handleNameBlur}
                           className="w-full bg-[#FDFCF8] border border-[#E8E4DB] focus:border-[#2D2824] rounded-xl px-4 py-3.5 text-[14px] font-sans text-[#2D2824] outline-none transition-colors"
                         />
                       </div>
@@ -778,7 +1046,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* 🔴 Account Security Section (Manual Form Submission) */}
                 <form
                   onSubmit={handlePasswordUpdate}
                   autoComplete="off"
@@ -854,7 +1121,6 @@ export default function Dashboard() {
             </div>
           ) : currentView === "projects" ? (
             <div className="animate-fade-in w-full pb-10">
-              {/* Add New Series Form */}
               <div className="bg-white p-8 rounded-2xl shadow-[0_4px_25px_rgba(0,0,0,0.02)] mb-12 border border-[#F2EFE9]">
                 <h3 className="text-[18px] font-serif font-medium text-[#2D2824] mb-6">
                   Conceive a New Series
@@ -905,14 +1171,12 @@ export default function Dashboard() {
                 </form>
               </div>
 
-              {/* Series Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-7">
                 {folders.map((folder) => (
                   <div
                     key={folder._id}
                     className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-[#E8E4DB] overflow-hidden flex flex-col transition-all hover:shadow-lg hover:-translate-y-1 group"
                   >
-                    {/* Color Banner */}
                     <div
                       className="h-2 w-full"
                       style={{ backgroundColor: folder.color || "#D4AF37" }}
@@ -939,7 +1203,6 @@ export default function Dashboard() {
                         {folder.description ||
                           "No synopsis provided for this series yet."}
                       </p>
-
                       <div className="pt-4 border-t border-[#F2EFE9] flex items-center justify-between">
                         <span className="text-[11px] font-sans font-medium text-[#A39A8E]">
                           {
@@ -981,9 +1244,7 @@ export default function Dashboard() {
               </div>
             </div>
           ) : currentView === "bible" ? (
-            /* 🔥 2. STORY CODEX (WIKI) PREMIUM UI */
             <div className="animate-fade-in w-full pb-10">
-              {/* Lore Creation Form */}
               <div className="bg-white p-8 rounded-2xl shadow-[0_4px_25px_rgba(0,0,0,0.02)] mb-8 border border-[#F2EFE9]">
                 <h3 className="text-[18px] font-serif font-medium text-[#2D2824] mb-6">
                   Expand Your Universe
@@ -1027,7 +1288,6 @@ export default function Dashboard() {
                 </form>
               </div>
 
-              {/* Wiki Navigation Tabs */}
               <div className="flex items-center gap-2 overflow-x-auto pb-6 mb-2 border-b border-[#E8E4DB]">
                 {["All", "Character", "Setting", "Plot", "Rule", "Item"].map(
                   (tab) => (
@@ -1042,7 +1302,6 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Dossier Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {loreEntries
                   .filter(
@@ -1061,22 +1320,10 @@ export default function Dashboard() {
                       >
                         ✕
                       </button>
-
                       <div className="flex items-center gap-3 mb-4">
                         <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-xs ${
-                            lore.category === "Character"
-                              ? "bg-amber-100 text-amber-700"
-                              : lore.category === "Setting"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : lore.category === "Rule"
-                                  ? "bg-purple-100 text-purple-700"
-                                  : lore.category === "Item"
-                                    ? "bg-sky-100 text-sky-700"
-                                    : "bg-gray-100 text-gray-700"
-                          }`}
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-xs ${lore.category === "Character" ? "bg-amber-100 text-amber-700" : lore.category === "Setting" ? "bg-emerald-100 text-emerald-700" : lore.category === "Rule" ? "bg-purple-100 text-purple-700" : lore.category === "Item" ? "bg-sky-100 text-sky-700" : "bg-gray-100 text-gray-700"}`}
                         >
-                          {/* Dynamic Icons based on category */}
                           {lore.category === "Character" && (
                             <svg
                               className="w-5 h-5"
@@ -1162,7 +1409,6 @@ export default function Dashboard() {
                           </h3>
                         </div>
                       </div>
-
                       <div className="bg-[#FDFCF8] p-4 rounded-xl border border-[#F2EFE9] flex-1">
                         <p className="text-[13px] text-[#4A443D] font-sans font-light leading-relaxed whitespace-pre-wrap">
                           {lore.content}
@@ -1170,7 +1416,6 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
-
                 {loreEntries.filter(
                   (lore) =>
                     activeLoreTab === "All" || lore.category === activeLoreTab,

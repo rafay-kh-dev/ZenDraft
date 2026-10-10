@@ -3,6 +3,7 @@ export default function AuthorSidebar({
   setCurrentView,
   isOpen,
   setIsOpen,
+  confirmSignOut,
 }) {
   const navItems = [
     {
@@ -21,6 +22,11 @@ export default function AuthorSidebar({
       icon: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z",
     },
     {
+      id: "library",
+      label: "The Library",
+      icon: "M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25",
+    },
+    {
       id: "wastebasket",
       label: "Discarded Pages",
       icon: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
@@ -31,12 +37,6 @@ export default function AuthorSidebar({
       icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
     },
   ];
-
-  const handleSignOut = () => {
-    localStorage.removeItem("zenToken");
-    localStorage.removeItem("zenUser");
-    window.location.href = "/";
-  };
 
   return (
     <>
@@ -113,11 +113,7 @@ export default function AuthorSidebar({
                 setIsOpen(false);
               }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-sans text-[13px] font-medium cursor-pointer relative group
-                ${
-                  currentView === item.id
-                    ? "bg-white text-[#2D2824] shadow-[0_4px_20px_rgba(0,0,0,0.03)] font-semibold"
-                    : "text-[#8C8781] hover:bg-[#F2EFE9] hover:text-[#2D2824]"
-                }`}
+                ${currentView === item.id ? "bg-white text-[#2D2824] shadow-[0_4px_20px_rgba(0,0,0,0.03)] font-semibold" : "text-[#8C8781] hover:bg-[#F2EFE9] hover:text-[#2D2824]"}`}
             >
               {currentView === item.id && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-[#D4AF37] rounded-r-full"></div>
@@ -142,7 +138,7 @@ export default function AuthorSidebar({
 
         <div className="p-6">
           <button
-            onClick={handleSignOut}
+            onClick={confirmSignOut}
             className="w-full flex items-center gap-3 px-4 py-3 text-[#A39A8E] hover:text-[#C95C5C] hover:bg-red-50/50 transition-all cursor-pointer font-sans text-[13px] font-medium rounded-xl"
           >
             <svg

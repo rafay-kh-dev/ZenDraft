@@ -26,7 +26,6 @@ export default function StudioHeader({
           <button
             onClick={() => setIsSidebarOpen(true)}
             className="md:hidden p-2 text-[#2D2824] hover:bg-[#F2EFE9] rounded-xl transition-colors cursor-pointer"
-            title="Open Navigation"
           >
             <svg
               className="w-5 h-5"
@@ -144,12 +143,23 @@ export default function StudioHeader({
               </h2>
             </div>
           </div>
+        ) : currentView === "library" ? (
+          // 🔥 Naya Library Header Section 🔥
+          <div className="flex justify-between items-end">
+            <div>
+              <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#D4AF37] mb-1 block">
+                Curated Collection
+              </span>
+              <h2 className="text-[36px] sm:text-[46px] text-[#2D2824] tracking-tight leading-none font-serif font-medium">
+                Inspiration Library
+              </h2>
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-5">
             <div>
               {currentView === "desk" && (
                 <div className="flex items-center gap-3 mb-2">
-                  {/* 🔥 Agar image hai toh show karo */}
                   {userPicture && (
                     <img
                       src={userPicture}
@@ -162,12 +172,12 @@ export default function StudioHeader({
                   </span>
                 </div>
               )}
-
               {currentView === "settings" && (
                 <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-[#D4AF37] mb-1 block">
                   Preferences
                 </span>
               )}
+
               <h2 className="text-[36px] sm:text-[46px] text-[#2D2824] tracking-tight leading-none font-serif font-medium mb-3">
                 {currentView === "wastebasket"
                   ? "Discarded Pages"
@@ -175,6 +185,7 @@ export default function StudioHeader({
                     ? "Studio Settings"
                     : "Your Desk"}
               </h2>
+
               {currentView === "desk" && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   <button

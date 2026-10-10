@@ -28,6 +28,9 @@ export default function Editor() {
     y: 0,
   });
 
+  // 🔥 Nayi state auto-save trigger karne ke liye
+  const [contentTrigger, setContentTrigger] = useState(0);
+
   const editorRef = useRef(null);
   const contentRef = useRef("");
   const typingTimeoutRef = useRef(null);
@@ -35,11 +38,13 @@ export default function Editor() {
 
   const DAILY_GOAL = 1000;
 
+  // 🔥 Updated Word Count Logic for extreme accuracy
   const wordCount = contentRef.current
     ? contentRef.current
-        .replace(/<[^>]*>?/gm, "")
+        .replace(/<[^>]*>?/gm, " ") // Tags ko space se replace karega taake words na jurein
+        .replace(/&nbsp;/g, " ") // HTML empty spaces ko real space banayega
         .trim()
-        .split(/\s+/)
+        .split(/\s+/) // Safely kisi bhi space se split karega
         .filter(Boolean).length
     : 0;
 
@@ -144,10 +149,11 @@ export default function Editor() {
     }, 1500);
 
     return () => clearTimeout(saveDebounce);
-  }, [title, contentRef.current, storyNotes, id]);
+  }, [title, contentTrigger, storyNotes, id]); // 🔥 Updated dependency to contentTrigger
 
   const handleInput = (e) => {
     contentRef.current = e.currentTarget.innerHTML;
+    setContentTrigger((prev) => prev + 1); // 🔥 Forces the auto-save effect to register the change
 
     triggerFocusMode();
     checkSelection();
@@ -176,6 +182,7 @@ export default function Editor() {
 
     if (editorRef.current) {
       contentRef.current = editorRef.current.innerHTML;
+      setContentTrigger((prev) => prev + 1); // Force save on formatting change too
       editorRef.current.focus();
       checkSelection();
     }
